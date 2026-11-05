@@ -1,0 +1,31 @@
+name: ci
+
+on:
+  push:
+    branches: [main, m1-index, m2-statute, m3-treatment, m4-rank]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: NLTK stop-word list (M1's tokenizer reads it at import)
+        run: python -m nltk.downloader stopwords
+      - name: Corpus (data/corpus/judgments.jsonl.xz is the tracked copy; unpacking checks its SHA-256)
+        run: python -m m1_index.ingest unpack
+      - name: M1 search index (built from the unpacked judgments.jsonl)
+        run: python -m m1_index.index build
+      - name: M2 per-judgment statute file (built from the unpacked judgments.jsonl)
+        run: python -m m2_statute.extractor build
+      - name: M3 citations, treatment and authority (from the committed Gemini label cache, no API key)
+        run: python -m m3_treatment.pipeline build
+      - name: Unit tests
+        run: python -m pytest
+      - name: Smoke test (contracts and end-to-end; stubs unless a module has flipped its switch)
+        run: python eval/smoke.py
