@@ -77,6 +77,21 @@ m3_treatment:
     max_bench: 7                    # bench weight = log(1 + bench) / log(1 + max_bench), capped at 1
     unknown_bench: 2                # bench size assumed for the weight only when it is unknown (the commonest bench)
   max_evidence: 5                   # evidence items stored per judgment
+  # --- Phase 2 (course classifiers and HITS); additive, nothing above changes ---
+  silver: data/llm_labels/m3_silver.jsonl      # TRAINING data only: windows with a cached Gemini label (never a test standard)
+  preds: data/processed/treatment_preds.jsonl  # window_id, classifier (nb | rocchio | knn | lr | llm), label, confidence
+  classifiers:                      # m3_treatment/nb.py, vector_classifiers.py, compare.py
+    folds: 5                        # stratified CV on the TRAINING data, for model selection only
+    seed: 0
+    nb_selection: [mi, chi2]        # feature-selection utilities tried (IIR 13.5)
+    nb_k_grid: [50, 100, 300, 1000, 3000, 0]   # top-k terms tried; 0 = every term
+    knn_k_grid: [1, 3, 5, 7]        # Guide: k chosen by cross-validation on training data only
+    model_selection: m3_treatment/reports/model_selection.json   # the frozen choice that classify_*() use
+  hits:                             # m3_treatment/hits.py
+    root_n: 30                      # root set = the top-N search() results for the query
+    max_in_per_root: 50             # Kleinberg's d: at most this many citing judgments added per root node (limits topic drift)
+    iterations: 50                  # maximum power iterations
+    tol: 1.0e-8                     # stop when the L1 change of both vectors is below this
 
 ranking:                            # owner: M4
   candidates: 100                   # top-N taken from search() before re-ranking

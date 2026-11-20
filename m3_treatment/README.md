@@ -112,6 +112,46 @@ judgments.jsonl
   -> doc_health.jsonl  ->  health(), authority()  (lookups only)                    scores.py
 ```
 
+## Phase 2: Naive Bayes, vector space classifiers, HITS
+
+Added from the Phase 2 guide (16 November 2026). Additive only: `health()`, `authority()` and every file format above are unchanged. Decisions and measured numbers: D-040 in [../DECISIONS.md](../DECISIONS.md).
+
+| File | What it is | IR concept |
+|---|---|---|
+| `features.py` | window tokens (M1's `tokenize()`, target replaced by a placeholder, `n:` copies of the text near the target), our own ltc tf-idf, stratified folds, macro-F1 | vector space model, tf-idf |
+| `nb.py` | multinomial and Bernoulli Naive Bayes, add-one smoothing, log-space scoring, MI and chi-square feature selection; `classify_nb(window)` | Naive Bayes, feature selection |
+| `vector_classifiers.py` | Rocchio (class centroids, cosine) and kNN (cosine-weighted vote, neighbours found through an inverted index); `classify_rocchio(window)`, `classify_knn(window, k=5)` | vector space classification, linear vs non-linear |
+| `hits.py` | root set from `search()`, base set with Kleinberg's cap d, hub and authority power iteration; `hits(root_doc_ids, iterations=50)`; comparison with PageRank | HITS, link analysis |
+| `compare.py` | silver training set, CV model selection, the five-classifier F1 table, `treatment_preds.jsonl` | classifier evaluation, micro vs macro F1 |
+
+**Status (2026-11-20).**
+* Done and measured: all four classifiers and HITS run on the real corpus. Model selection is done (`reports/model_selection.md`). HITS against PageRank is done (`reports/hits_vs_pagerank.md`). `treatment_preds.jsonl` is built
+  (out-of-fold for the silver windows). 22 tests check the code against textbook worked examples and against scikit-learn and SciPy.
+* **Open: the F1 table**, because `data/treatment_gold.csv` has no hand labels yet. The blank sheets are in `data/labelling/` (250 windows, 60 doubly labelled): label them following [LABELLING_GUIDE.md](LABELLING_GUIDE.md), then
+  `python -m m3_treatment.gold merge`, `python -m m3_treatment.compare select` (training then drops the gold windows) and `python -m m3_treatment.compare evaluate`. The LLM row of that table also needs
+  `python -m m3_treatment.pipeline label-llm`: once a gold set exists, the few-shot prompt changes and the gold windows must be labelled under it (Gemini key, offline).
+
+**Training and test data.**
+* The classifiers train on the **silver** set (`data/llm_labels/m3_silver.jsonl`): 1,165 windows with a cached Gemini label. That is training data only.
+* They are tested only on the **hand-labelled gold set**. Every gold window is removed from training first.
+* Hyperparameters (NB variant, selection method and k; kNN k) are chosen by 5-fold CV on the training data.
+* Limitation: the silver set holds only `cued` windows (an overrule or doubt cue near the citation), so its class mix and wording differ from the gold set's (D-040).
+
+**Using it.**
+* `classify_*()` train on first call, in about 3 s, and then take about 1 ms per window. They read the silver file and `reports/model_selection.json`.
+* `hits()` loads the citation graph once (about 0.7 s), then takes under 30 ms per query on the dev queries.
+* For M4's `full_hits` ablation and the demo's hubs panel: `hubs, auths = hits([h.doc_id for h in search(q, k=30)])`. Both dicts cover the base set with scores in [0, 1].
+
+| Command | What it does |
+|---|---|
+| `python -m m3_treatment.compare silver` | silver set from `m3_mentions.jsonl` + the LLM cache (run `make m3-extract` first) |
+| `python -m m3_treatment.compare select` | CV model selection on the training data -> `reports/model_selection.{md,json}` |
+| `python -m m3_treatment.compare evaluate` | the F1 table (LLM, LR, NB, Rocchio, kNN) on the gold set -> `reports/classifier_compare.{md,json}` |
+| `python -m m3_treatment.compare preds` | `data/processed/treatment_preds.jsonl` |
+| `python -m m3_treatment.compare all` | all of the above that can run |
+| `python -m m3_treatment.hits compare` | HITS vs PageRank, globally and per dev query -> `reports/hits_vs_pagerank.{md,json}` |
+| `python -m pytest tests/test_m3_phase2.py` | the 22 Phase 2 tests |
+
 ## M3 hands over
 
 `citations.jsonl` (every mention with its window, label, confidence and bench sizes), `doc_health.jsonl`, the label
