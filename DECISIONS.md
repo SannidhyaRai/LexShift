@@ -580,6 +580,46 @@ name lanes and never people (commit authors are not read).
   title and citation data packed (12 MB), `python -m app.setup` (or `run_demo.ps1`) restores everything and rebuilds the search index in about 3 minutes with no key and no network, and `app.server --real` ignores a stale `LEXSHIFT_STUBS`
   left in a shell (that override, started from another terminal, is what turned stub mode on). An unreadable index file now gives one message that says how to rebuild it.
 
+### D-040 (2026-11-21) M1 Phase 2: tolerant retrieval, compression and skip pointers
+What the Phase 2 guide asks of M1, built in `m1_index/dictionary.py`, `m1_index/compress.py`, `m1_index/skips.py` and a `WildcardNode` in
+`query_parser.py`. `search()`'s signature is unchanged. Every number below comes from `m1_index/reports/dictionary.md`, `compression.md` and
+`skips.md`, generated on the 4,819-judgment index by the commands named in them.
+
+* **Wildcards run on surface words, not stems.** The index stores Porter stems (`homicide` is `homicid`), so a wildcard over the index's own
+  vocabulary cannot match `*cide` and would match stems nobody typed. A second dictionary holds the **210,469 surface words** (lower-cased words
+  the tokenizer keeps, before stemming) with their document frequency, built with the index (`python -m m1_index.index build`, +16 s, 4.1 MB file).
+  A wildcard is matched against surface words with the k-gram index (k = 3, `$` boundary, always post-filtered), its 50 most frequent matches
+  (`wildcard_limit`) are mapped to their stems with the same tokenizer, and the stems are ORed. A phrase with a wildcard word is the OR of the
+  phrases its expansions spell, capped at 64 (`wildcard_phrase_limit`). `"common intent*" /s murd*` returns 10 ranked judgments in 13 ms.
+* **Permuterm is built only for the report.** It holds 1,843,713 rotations against the k-gram index's 1,628,990 postings over 21,439 grams:
+  3.9 times the bytes (25.9 MB against 6.7 MB of keys and 4-byte ids). On every pattern in the report it returns the same words as the k-gram index.
+* **Spelling suggestions.** Candidates share k-grams with the word (Jaccard at least 0.2) and are ranked by edit distance, then df. Two
+  choices were made on evidence, not by default. (1) An adjacent swap counts as **one edit** (Damerau's transposition, optimal-string-alignment
+  form): with plain Levenshtein, `culpabel` goes to `culpabil` (an OCR fragment in 6 judgments, 1 edit) and not `culpable` (345, 2 edits).
+  (2) The Jaccard cutoff is 0.2, not 0.3: at 0.3 `deth` loses `death` (Jaccard 0.29) and is corrected to `seth`. A word is corrected when it is
+  in no judgment (by a candidate in at least 3), or when it is in at most 3 judgments, or the query finds fewer than 3, and a candidate is at
+  least 20 times as frequent. Numbers, statute and citation tokens, the tokenizer's legal abbreviations, wildcards, operators and stop words
+  are never touched. **Known limit:** k-gram overlap is weak on 4-letter words: `bale` is suggested as `sale`, not `bail` (they share 1 of 7 grams).
+* **Soundex** (American, H/W rule) over the words of the case titles, offered as `search(q, filters={"party": name})`. A new filter key is
+  additive and changes no signature. `Mohd`/`Md` are expanded to `Mohammad` before coding, because Soundex cannot see through an abbreviation:
+  Mohammed, Muhammad and Mohd then all give M530 and match 112 titles. It conflates other names too (Mahmood and Manmeet are also M530), which is
+  what a phonetic code does; it is a filter for recall, not an identity check. The resolver fallback is M3's to decide.
+* **Compression: the live format stays raw arrays.** Gaps + VB cut document numbers and positions from 80.4 MB to 28.9 MB (36%), and gaps +
+  Elias gamma to 30.9 MB (38%; gamma wins on document gaps, 5.69 against 8.76 bits, and loses on position gaps). Everything decodes back to
+  the index's arrays exactly. Reading a query's postings from VB would cost at most about 5 ms more per query (6.1 ms instead of 1.2 ms), so the
+  one-second budget would allow the change. It is not made: the 51.6 MB saved does not matter on a laptop, the file on disk is already gzip,
+  and `app/m1_view.py` reads `index.p_doc` directly.
+* **Skip pointers save nothing measurable on this corpus, and are left on.** √L skips over the merge intersection (implicit pointers, since
+  postings are slices of one flat array). Over the 120 pairs of 16 common terms they cost 1.4% **more** comparisons (299,150 without skips,
+  303,368 with), and 1.6% more inside the engine's AND/phrase evaluation. The reason: with 4,819 document numbers a common term's list covers
+  most of them (df 4,217 for `evid`), so the short list's next document is almost never a whole skip span away. They help only where one list
+  is much shorter (up to 7%), and a synthetic test with a 50,000-entry list shows the expected large saving. They stay on because the results
+  are identical and the cost is about 1%. `RankedSearchEngine(skips=False)` turns them off. The engine's binary-search probe of long lists,
+  which predates this, is what saves work here.
+* **Shared files not changed yet.** The guide's config keys (`tolerant: {kgram_k: 3, spell_max_edit: 2}` and the others above) live as
+  defaults in `m1_index.dictionary.DEFAULTS`; `settings()` reads a `tolerant:` section of `common/config.yaml` if one is added. Flagged stubs of
+  `expand_wildcard`, `suggest` and `soundex` in `stubs/fixed.py` are also pending: both are shared files and wait for the team's agreement.
+
 ## Open questions
 
 * **OQ-1** How is the 200-document sample shared with the team (committed under `data/sample/`, a release asset, or a shared

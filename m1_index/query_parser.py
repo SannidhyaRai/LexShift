@@ -4,6 +4,8 @@ Supports:
   - Boolean: AND, OR, NOT
   - Proximity: /s (same sentence), /p (same paragraph), /k (within k tokens)
   - Phrases: "common intention"
+  - Wildcards: murd*, *cide, cons*acy, and inside phrases ("common intent*"). The parser only records the pattern; the search
+    engine expands it through the dictionary of surface forms (m1_index.dictionary) and ORs the expanded terms.
 
 Precedence, tightest first: proximity, NOT, AND, OR (parentheses override). Every malformed query raises ValueError and nothing
 else; the engine then treats the text as a bag of words.
@@ -12,7 +14,7 @@ else; the engine then treats the text as a bag of words.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from m1_index.tokenizer import tokenize
 
@@ -44,6 +46,54 @@ class BooleanNode:
 @dataclass
 class NotNode:
     child: object
+
+
+@dataclass
+class WildcardNode:
+    """A wildcard term. `terms` (index terms) is filled by the search engine when it expands the pattern; None until then."""
+
+    pattern: str
+    terms: list[str] | None = None
+
+
+@dataclass
+class WildcardPhraseNode:
+    """A phrase with at least one wildcard word: `parts` holds index terms (str) and WildcardNode slots, in order. The engine
+    evaluates it as the OR of the phrases its expansions spell (capped, see m1_index.dictionary)."""
+
+    parts: list
+    expanded: object = field(default=None, repr=False)
+
+
+RE_WILDCARD = re.compile(r"[a-z0-9*][a-z0-9*\-]*")
+
+
+def make_wildcard(token: str) -> WildcardNode:
+    """A WildcardNode for a query word containing '*'. ValueError when the pattern is malformed or too broad: it needs at least
+    two letters or digits besides the stars (a bare '*' or 'a*' would match a large part of the vocabulary)."""
+    pattern = token.lower().strip(".,;:!?'")
+    if not RE_WILDCARD.fullmatch(pattern):
+        raise ValueError(f"Invalid wildcard {token!r}: use letters, digits, '-' and '*'")
+    pattern = re.sub(r"\*+", "*", pattern)
+    if len(pattern.replace("*", "")) < 2:
+        raise ValueError(f"Wildcard {token!r} is too broad: give at least two letters besides '*'")
+    return WildcardNode(pattern)
+
+
+def _phrase_with_wildcards(phrase_text: str) -> object:
+    """Parts of a quoted phrase in which some word has a '*': ordinary words go through the tokenizer (stop words drop out, as
+    they do in the index's positions), wildcard words become slots."""
+    parts: list = []
+    for word in phrase_text.split():
+        if "*" in word:
+            parts.append(make_wildcard(word))
+        else:
+            parts.extend(tokenize(word))
+    if not parts:
+        raise ValueError(f"Phrase contains no indexable terms: {phrase_text!r}")
+    if len(parts) == 1:
+        return parts[0] if isinstance(parts[0], WildcardNode) else PhraseNode(parts)
+    return WildcardPhraseNode(parts)
 
 
 RE_QUERY_TOKEN = re.compile(
@@ -84,6 +134,8 @@ def parse_atom(tokens: list[str], position: int):
         phrase_text = token[1:-1].strip()
         if not phrase_text:
             raise ValueError("Empty phrase")
+        if "*" in phrase_text:
+            return _phrase_with_wildcards(phrase_text), position + 1
         terms = tokenize(phrase_text)
         if not terms:
             terms = [t.lower() for t in phrase_text.split() if t]
@@ -100,6 +152,10 @@ def parse_atom(tokens: list[str], position: int):
 
     if token == ")":
         raise ValueError("Unexpected closing parenthesis ')' without matching '('")
+
+    # Wildcard term
+    if "*" in token:
+        return make_wildcard(token), position + 1
 
     # Ordinary term
     norm = normalize_term(token)

@@ -6,7 +6,7 @@ Contract and field list: [../docs/CONTRACTS.md](../docs/CONTRACTS.md). Every num
 ## Status
 
 **Done.** `stubs.search` is `false`. The corpus is **4,819 English Supreme Court judgments** (2005 to 2025, plus 8 named cases from 1962 to 1996), read from the public dataset by `ingest.py`; the
-index over it is 52.7 MB on disk and 125 MB in memory, builds in about 140 s and loads in about 2 s; `search()` takes a median of 19.6 ms over the 16 benchmark queries (`python -m m1_index.benchmark`, `reports/benchmark.md`; 7.8 ms in an earlier run on a quieter machine, so read it as 10 to 20 ms).
+index over it is 52.7 MB on disk and 125 MB in memory, builds in about 140 s and loads in about 2 s; `search()` takes a median of 2.8 ms over the 16 benchmark queries in the latest run (`python -m m1_index.benchmark`, `reports/benchmark.md`; earlier runs on other machines gave 7.8 and 19.6 ms, so read it as a few to 20 ms).
 
 | Piece | File | State |
 |---|---|---|
@@ -20,6 +20,9 @@ index over it is 52.7 MB on disk and 125 MB in memory, builds in about 140 s and
 | BM25, lnc.ltc, heap top-K | `scoring.py`, `searcher.py` | done |
 | Query optimisation (smallest posting list first, probes, early stop) | `searcher.py` | done, compared with the naive order in tests |
 | Sanity check against `rank_bm25` and latency | `benchmark.py`, `reports/benchmark.md` | done |
+| **Phase 2.** Dictionary of surface forms, k-gram wildcards, permuterm (report only), edit distance, spelling suggestions, Soundex | `dictionary.py`, `reports/dictionary.md` | done, see below |
+| **Phase 2.** Gap encoding, variable-byte and Elias gamma codes, size and decode-time table | `compress.py`, `reports/compression.md` | done (live format unchanged, D-040) |
+| **Phase 2.** Skip pointers in the AND / phrase intersection, comparisons counted | `skips.py`, `searcher.py`, `reports/skips.md` | done (no saving at this corpus size, D-040) |
 
 ## The corpus
 
@@ -69,6 +72,39 @@ when `data/raw` was empty).
   for comparison. The idf is ln(1 + (N - n + 0.5) / (n + 0.5)), positive for every term; `reports/benchmark.md` shows where `rank_bm25` differs (terms in about half the corpus) and by how much.
 * **Libraries.** PyMuPDF turns a PDF into text; pyarrow reads the dataset's metadata parquet; NLTK gives the Porter stemmer and stop-word list; `rank_bm25` is used only in the benchmark. Every IR step is our code.
 
+## Phase 2: tolerant retrieval, compression, skip pointers
+
+Public functions (Phase 2 contract), all in `m1_index/dictionary.py`:
+
+```python
+expand_wildcard(pattern: str, limit: int = 50) -> list[str]   # 'murd*' -> ['murder', 'murdered', 'murders', ...]
+suggest(query: str) -> str | None                            # 'culpabel homicide' -> 'culpable homicide'; None if nothing changes
+soundex(name: str) -> str                                    # 'Mohammed' -> 'M530'
+search(query, k, filters={"party": "Mohammed"})              # new filter key: titles that sound like the name (signature unchanged)
+```
+
+* **Wildcards in queries.** `murd*`, `*cide`, `cons*acy`, and inside phrases (`"common intent*" /s murd*`). The parser records a `WildcardNode`;
+  the engine expands it to the stems of the 50 most frequent matching **surface** words and ORs them. The index stores stems
+  (`homicide` is `homicid`), so wildcards run on a separate dictionary of the 210,469 words before stemming (D-040). Matching uses a k-gram index
+  (k = 3, `$` boundary), whose candidates are always post-filtered against the pattern. A permuterm index is built for the size comparison only
+  (3.9 times larger).
+* **Spelling.** Candidates come from k-gram Jaccard overlap and are ranked by our own edit distance (dynamic programming; an adjacent swap is
+  one edit), then by df. Statute numbers, citation tokens and the legal abbreviations are never corrected. Rules and examples are in
+  `reports/dictionary.md`.
+* **Soundex** over the words of case titles; `Mohd`/`Md` are expanded first. A recall filter: other names share codes too (Mahmood is also M530).
+* **Compression.** Gaps + VB bring document numbers and positions to 36% of the raw arrays, gaps + gamma to 38%. Every list is checked by
+  decoding it back. The live format stays the raw arrays; the reasons are in `reports/compression.md` and D-040.
+* **Skip pointers.** √L spacing in the merge intersections, with comparisons counted in `WorkStats`. On this corpus they save nothing
+  measurable (about 1% more comparisons) because common terms cover most of the 4,819 document numbers; `reports/skips.md` explains why.
+
+```bash
+python -m m1_index.index build        # now also builds data/processed/index/dictionary.pkl.gz (+16 s); built on first use if missing
+python -m m1_index.dictionary report  # reports/dictionary.md: k-gram vs permuterm, wildcards, suggestions, Soundex (about 30 s)
+python -m m1_index.compress           # reports/compression.md: sizes, decode times, round-trip check (about 35 s)
+python -m m1_index.skips              # reports/skips.md: comparisons with and without skips
+python -m m1_index.dictionary wildcard 'murd*' | suggest culpabel homicide | soundex Mohammed
+```
+
 ## Limits, stated
 
 * Zones are a heuristic (headings and position), not an annotation. A headnote longer than 15,000 characters is cut there and the rest counts as facts.
@@ -81,4 +117,6 @@ when `data/raw` was empty).
 ## Tests
 
 `python -m pytest tests/test_m1_*.py` (ingest, selection, catalog, tokenizer, parser, scoring, golden queries on real excerpts, and a differential test of the compact index and the optimised engine against
-a plain reference on random corpora and queries).
+a plain reference on random corpora and queries). Phase 2: `test_m1_tolerant.py` (k-grams, wildcards against a brute-force scan, permuterm against
+k-grams, edit distance against a full-matrix reference, suggestions, Soundex, wildcard and party queries through the engine) and `test_m1_compress.py`
+(the IIR textbook VB and gamma codes, random round trips, a multi-zone index round trip, skip intersection against set intersection).

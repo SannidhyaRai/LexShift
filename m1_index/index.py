@@ -494,6 +494,9 @@ def build_from_processed(judgments_path: Path | str | None = None, index_dir: Pa
     print(f"{s['docs']} documents, {s['terms']} terms, {s['postings']} postings, {s['positions']} positions "
           f"({idx.memory_bytes() / (1024 * 1024):.1f} MB of arrays in memory)")
     idx.save(Path(index_dir) if index_dir else INDEX_DIR)
+    from m1_index.dictionary import build_from_processed as build_dictionary  # the surface dictionary for wildcards and spelling
+
+    build_dictionary(jpath, Path(index_dir) if index_dir else INDEX_DIR)
     return 0
 
 
