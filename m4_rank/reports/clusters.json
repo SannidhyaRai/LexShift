@@ -1,0 +1,389 @@
+{
+  "k": 12,
+  "k_rule": "elbow",
+  "k_elbow": 12,
+  "k_aic": 2,
+  "seed": 0,
+  "n_init": 3,
+  "max_iter": 100,
+  "rss": 3802.682006435225,
+  "iterations": 30,
+  "converged": true,
+  "chosen_seed": 0,
+  "empty_fixes": 0,
+  "n_docs": 4819,
+  "dims": 2000,
+  "zero_vectors": 0,
+  "vocab": {
+    "size": 2000,
+    "min_df": 10,
+    "max_df_ratio": 0.5
+  },
+  "rss_curve": [
+    {
+      "k": 2,
+      "rss": 4016.3658422777276,
+      "iterations": 12,
+      "converged": true,
+      "seed": 0,
+      "seconds": 2.02
+    },
+    {
+      "k": 4,
+      "rss": 3939.316024067598,
+      "iterations": 59,
+      "converged": true,
+      "seed": 1,
+      "seconds": 6.53
+    },
+    {
+      "k": 6,
+      "rss": 3889.3974983055195,
+      "iterations": 87,
+      "converged": true,
+      "seed": 1,
+      "seconds": 8.55
+    },
+    {
+      "k": 8,
+      "rss": 3858.369754796403,
+      "iterations": 17,
+      "converged": true,
+      "seed": 0,
+      "seconds": 6.76
+    },
+    {
+      "k": 10,
+      "rss": 3832.090581919989,
+      "iterations": 33,
+      "converged": true,
+      "seed": 0,
+      "seconds": 4.09
+    },
+    {
+      "k": 12,
+      "rss": 3802.682006435225,
+      "iterations": 30,
+      "converged": true,
+      "seed": 0,
+      "seconds": 4.31
+    },
+    {
+      "k": 15,
+      "rss": 3775.144951620333,
+      "iterations": 45,
+      "converged": true,
+      "seed": 0,
+      "seconds": 6.33
+    },
+    {
+      "k": 20,
+      "rss": 3739.581852968957,
+      "iterations": 43,
+      "converged": true,
+      "seed": 0,
+      "seconds": 5.4
+    },
+    {
+      "k": 25,
+      "rss": 3711.3232404095857,
+      "iterations": 45,
+      "converged": true,
+      "seed": 0,
+      "seconds": 8.04
+    },
+    {
+      "k": 30,
+      "rss": 3695.4521490983216,
+      "iterations": 20,
+      "converged": true,
+      "seed": 1,
+      "seconds": 6.72
+    }
+  ],
+  "labels": [
+    "union, legislative, writ, national",
+    "circumstantial, chain, hypothesis, confession",
+    "arijit, pasayat, nutshell, criminalappellate",
+    "mitigating, aggravating, rarest, imposition",
+    "narcotic, drugs, bag, sample",
+    "inherent, quashed, mala, manifestly",
+    "sudden, fight, provocation, cruel",
+    "corruption, sanction, servant, bank",
+    "bail, petition, petitioner, granted",
+    "rape, sexual, consent, girl",
+    "dowry, cruelty, suicide, 498a",
+    "wound, cm, armed, incised"
+  ],
+  "clusters": [
+    {
+      "cluster_id": 0,
+      "size": 519,
+      "label": "union, legislative, writ, national",
+      "label_terms": [
+        "union",
+        "legisl",
+        "writ",
+        "nation"
+      ],
+      "centroid_terms": [
+        "union",
+        "legisl",
+        "writ",
+        "statut"
+      ],
+      "top_offence": "OFF_HIGH_COURT_POWERS",
+      "top_offence_share": 0.1194,
+      "labelled_members": 377
+    },
+    {
+      "cluster_id": 1,
+      "size": 732,
+      "label": "circumstantial, chain, hypothesis, confession",
+      "label_terms": [
+        "circumstanti",
+        "chain",
+        "hypothesi",
+        "confess"
+      ],
+      "centroid_terms": [
+        "circumstanti",
+        "chain",
+        "hypothesi",
+        "confess"
+      ],
+      "top_offence": "OFF_MURDER",
+      "top_offence_share": 0.4941,
+      "labelled_members": 682
+    },
+    {
+      "cluster_id": 2,
+      "size": 350,
+      "label": "arijit, pasayat, nutshell, criminalappellate",
+      "label_terms": [
+        "arijit",
+        "pasayat",
+        "nutshel",
+        "criminalappel"
+      ],
+      "centroid_terms": [
+        "arijit",
+        "pasayat",
+        "nutshel",
+        "version"
+      ],
+      "top_offence": "OFF_MURDER",
+      "top_offence_share": 0.4394,
+      "labelled_members": 289
+    },
+    {
+      "cluster_id": 3,
+      "size": 177,
+      "label": "mitigating, aggravating, rarest, imposition",
+      "label_terms": [
+        "mitig",
+        "aggrav",
+        "rarest",
+        "imposit"
+      ],
+      "centroid_terms": [
+        "mitig",
+        "aggrav",
+        "rarest",
+        "imposit"
+      ],
+      "top_offence": "OFF_MURDER",
+      "top_offence_share": 0.494,
+      "labelled_members": 166
+    },
+    {
+      "cluster_id": 4,
+      "size": 160,
+      "label": "narcotic, drugs, bag, sample",
+      "label_terms": [
+        "narcot",
+        "drug",
+        "bag",
+        "sampl"
+      ],
+      "centroid_terms": [
+        "narcot",
+        "drug",
+        "sampl",
+        "bag"
+      ],
+      "top_offence": "OFF_POLICE_STATEMENT",
+      "top_offence_share": 0.2812,
+      "labelled_members": 32
+    },
+    {
+      "cluster_id": 5,
+      "size": 110,
+      "label": "inherent, quashed, mala, manifestly",
+      "label_terms": [
+        "inher",
+        "quash",
+        "mala",
+        "manifestli"
+      ],
+      "centroid_terms": [
+        "inher",
+        "quash",
+        "abus",
+        "mala"
+      ],
+      "top_offence": "OFF_HIGH_COURT_POWERS",
+      "top_offence_share": 0.7364,
+      "labelled_members": 110
+    },
+    {
+      "cluster_id": 6,
+      "size": 151,
+      "label": "sudden, fight, provocation, cruel",
+      "label_terms": [
+        "sudden",
+        "fight",
+        "provoc",
+        "cruel"
+      ],
+      "centroid_terms": [
+        "sudden",
+        "fight",
+        "provoc",
+        "cruel"
+      ],
+      "top_offence": "OFF_MURDER",
+      "top_offence_share": 0.6358,
+      "labelled_members": 151
+    },
+    {
+      "cluster_id": 7,
+      "size": 504,
+      "label": "corruption, sanction, servant, bank",
+      "label_terms": [
+        "corrupt",
+        "sanction",
+        "servant",
+        "bank"
+      ],
+      "centroid_terms": [
+        "corrupt",
+        "sanction",
+        "quash",
+        "servant"
+      ],
+      "top_offence": "OFF_HIGH_COURT_POWERS",
+      "top_offence_share": 0.3235,
+      "labelled_members": 371
+    },
+    {
+      "cluster_id": 8,
+      "size": 909,
+      "label": "bail, petition, petitioner, granted",
+      "label_terms": [
+        "bail",
+        "petit",
+        "petition",
+        "grant"
+      ],
+      "centroid_terms": [
+        "bail",
+        "petit",
+        "petition",
+        "grant"
+      ],
+      "top_offence": "OFF_MURDER",
+      "top_offence_share": 0.1193,
+      "labelled_members": 729
+    },
+    {
+      "cluster_id": 9,
+      "size": 191,
+      "label": "rape, sexual, consent, girl",
+      "label_terms": [
+        "rape",
+        "sexual",
+        "consent",
+        "girl"
+      ],
+      "centroid_terms": [
+        "rape",
+        "sexual",
+        "consent",
+        "girl"
+      ],
+      "top_offence": "OFF_RAPE",
+      "top_offence_share": 0.7836,
+      "labelled_members": 171
+    },
+    {
+      "cluster_id": 10,
+      "size": 298,
+      "label": "dowry, cruelty, suicide, 498a",
+      "label_terms": [
+        "dowri",
+        "cruelti",
+        "suicid",
+        "498a"
+      ],
+      "centroid_terms": [
+        "dowri",
+        "cruelti",
+        "suicid",
+        "498a"
+      ],
+      "top_offence": "OFF_CRUELTY_TO_WOMEN",
+      "top_offence_share": 0.4417,
+      "labelled_members": 283
+    },
+    {
+      "cluster_id": 11,
+      "size": 718,
+      "label": "wound, cm, armed, incised",
+      "label_terms": [
+        "wound",
+        "cm",
+        "arm",
+        "incis"
+      ],
+      "centroid_terms": [
+        "wound",
+        "cm",
+        "weapon",
+        "arm"
+      ],
+      "top_offence": "OFF_MURDER",
+      "top_offence_share": 0.5559,
+      "labelled_members": 680
+    }
+  ],
+  "evaluation": {
+    "against": "dominant offence_id per judgment from M2's doc_statutes.jsonl (automatic, not a human gold standard)",
+    "labelled_docs": 4041,
+    "unlabelled_docs": 778,
+    "classes": 37,
+    "purity": 0.40113833209601585,
+    "nmi": 0.2643132825450132,
+    "rand_index": 0.8098230758487875,
+    "pair_precision": 0.2289332233732759,
+    "pair_recall": 0.22505255860939152,
+    "f1": 0.22697630505449679,
+    "f5": 0.22519938061349423,
+    "n": 4041,
+    "tp": 227906,
+    "fp": 767607,
+    "fn": 784773,
+    "tn": 6382534
+  },
+  "crosscheck": {
+    "sklearn_rss": 3810.5714319360613,
+    "our_rss": 3802.682006435225,
+    "rss_ratio_ours_over_sklearn": 0.9979295951691876,
+    "agreement_ari": 0.541684066505841,
+    "sklearn_nmi_of_our_clusters": 0.26431328254501324,
+    "our_nmi": 0.2643132825450132,
+    "sklearn_rand_of_our_clusters": 0.8098230758487875,
+    "our_rand": 0.8098230758487875
+  },
+  "seconds": 130.1
+}
