@@ -4,6 +4,7 @@ import { scrollToTarget, setNavActive, swapView } from "./motion.js";
 import { applyParams, focusQuery, initSearch, paramsDiffer, renderFormula } from "./search.js";
 import { initStatus } from "./status.js";
 import { renderEvaluation } from "./evaluation.js";
+import { renderPhase2 } from "./phase2.js";
 import { renderJudging } from "./judging.js";
 import { renderIndexPage } from "./m1.js";
 import { renderStatutesPage } from "./statutes.js";
@@ -13,7 +14,7 @@ import { initTooltips } from "./ui.js";
 const THEME_KEY = "lexshift.theme";
 const ROUTES = { "/": "search", "/index": "index", "/statutes": "statutes", "/treatment": "treatment", "/ranking": "ranking", "/evaluation": "ranking", "/judging": "judging" };
 const TITLES = { index: "Index (M1)", statutes: "Statutes (M2)", treatment: "Treatment (M3)", ranking: "Ranking (M4)", judging: "Judging" };
-const RENDER = { index: renderIndexPage, statutes: renderStatutesPage, treatment: renderTreatmentPage, ranking: renderEvaluation, judging: renderJudging };
+const RENDER = { index: renderIndexPage, statutes: renderStatutesPage, treatment: renderTreatmentPage, ranking: async () => { await renderEvaluation(); await renderPhase2(); }, judging: renderJudging };
 let current = null;
 let searchBooted = false;
 

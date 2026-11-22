@@ -81,6 +81,40 @@ Never tune on test queries. Keep stubs working so integration starts on day one.
 overruling list are made by hand: do not let a model generate the labels the system is scored against. Never write "dead
 law" or "bad law" in the UI: say "treatment signals", show evidence and confidence, and include the not-legal-advice note.
 
+## Phase 2: flat clustering, inexact top-K, new ablations, evaluation extras
+
+| Piece | Where | Status |
+|---|---|---|
+| K-means (ours): k-means++, restarts, empty-cluster refill; K from the RSS elbow, AIC reported | `cluster.py` | done, K = 12 on the full corpus |
+| Cluster evaluation: purity, NMI, Rand index, F1/F5 against the dominant offence (automatic labelling) | `cluster.py` | done, scikit-learn cross-check agrees |
+| Cluster labels (differential centroid terms as surface words), `cluster_of()` | `cluster.py` | done |
+| Inexact top-K: champion lists, tiered index, index elimination, cluster pruning; speed vs nDCG@10 | `inexact.py` | done, measured on dev |
+| `full_hits` (HITS authority) and `full_tiered` (tiered candidates) configs | `rank.py`, `weights.py`, `common/config.yaml` | done, in `run_ablation` |
+| PR curves, 11-point interpolated AP, R-precision, MRR | `eval/metrics.py`, `eval/plots.py` | done |
+| Demo: did-you-mean, wildcard expansions, cluster chip and facet, HITS hubs, cluster browser, inexact table | `app/` | done |
+
+```bash
+python -m m4_rank.cluster build          # vectors, RSS curve, K, clusters, evaluation, labels (about 2 minutes, offline)
+python -m m4_rank.inexact build          # champion lists, tier-1 postings, cluster-pruning leaders (seconds, offline)
+python -m m4_rank.inexact report         # speed vs quality on the judged dev queries
+python -m m4_rank.inexact query "dowry death" --method champion
+python -m eval.run_ablation --split dev  # b0, b1, full, full_hits, full_tiered (+ PR curves)
+```
+
+The builds write git-ignored files under `data/processed/` (`clusters.jsonl`, `clusters_meta.json`, `inexact.pkl.gz`) and the
+committed reports in [reports/](reports/): [clusters.md](reports/clusters.md) and [inexact.md](reports/inexact.md). Both are
+seeded and reproducible. Choices and the measured numbers are in DECISIONS.md D-041.
+
+What the numbers say, plainly. The clusters line up only partly with the main offence (NMI 0.26): they are topical (sentencing,
+dowry and cruelty, sexual offences, quashing under inherent powers) and one groups judgments by author. Index elimination and
+champion lists keep most of exact BM25's top 10 at about a fifth of the time. The tiered index and cluster pruning lose much
+more, so `full_tiered` is reported as an ablation with its cost, never used as the default. HITS authority did not beat PageRank
+on the dev queries with the untuned weights.
+
+IR concepts for the video: flat clustering, K-means and RSS, choosing K, purity / NMI / RI / F, the cluster hypothesis;
+champion lists, static quality g(d), tiered indexes, index elimination, cluster pruning; PR curves, interpolation, R-precision,
+MRR.
+
 ## Status
 
 See the status table in the top-level [README](../README.md#status).

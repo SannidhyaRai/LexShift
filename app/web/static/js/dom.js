@@ -59,8 +59,10 @@ export const CONFIG_LABELS = {
   b0: "B0: BM25 relevance only",
   b1: "B1: relevance and continuity",
   full: "Full: relevance, continuity, treatment, authority",
+  full_hits: "Full with HITS authority instead of PageRank",
+  full_tiered: "Full over tiered-index candidates (inexact top-K)",
 };
-export const SHORT_CONFIG = { b0: "BM25 only", b1: "BM25 + continuity", full: "Full ranking" };
+export const SHORT_CONFIG = { b0: "BM25 only", b1: "BM25 + continuity", full: "Full ranking", full_hits: "Full, HITS authority", full_tiered: "Full, tiered index" };
 
 export const f2 = (x) => (typeof x === "number" && Number.isFinite(x) ? x.toFixed(2) : "n/a");
 export const f3 = (x) => (typeof x === "number" && Number.isFinite(x) ? x.toFixed(3) : "n/a");

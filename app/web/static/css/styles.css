@@ -526,3 +526,22 @@ mark { background: color-mix(in srgb, var(--c-cont) 35%, transparent); color: in
 .tip.is-on { opacity: 1; }
 
 .footer { padding-top: 24px; padding-bottom: 32px; border-top: 1px solid var(--line); font-size: 0.8rem; color: var(--faint); }
+
+
+/* ---- Phase 2 (M4): did-you-mean, topic clusters, HITS hubs, inexact top-K ---- */
+.link-btn { background: none; border: 0; padding: 0; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; text-align: left; }
+.link-btn:hover { color: var(--text); }
+.tolerant { margin: 0 0 10px; font-size: 0.9rem; color: var(--muted); }
+.facets { margin: 0 0 12px; align-items: center; }
+.chip-cluster { max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hubs { margin-top: 18px; }
+.hubs .rank-list li { grid-template-columns: 22px minmax(0, 1fr); }
+.section-title { margin: 32px 0 12px; }
+#phase2-body .card { margin-bottom: 18px; }
+.cluster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; margin: 12px 0; }
+.cluster-card { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--text); cursor: pointer; }
+.cluster-card:hover, .cluster-card.is-on { border-color: var(--text); }
+.cluster-id { font-family: var(--mono); font-size: 0.75rem; color: var(--faint); }
+.cluster-members { margin: 6px 0 14px; }
+.member-list { margin: 6px 0 0; padding-left: 22px; font-size: 0.9rem; }
+.member-list li { padding: 3px 0; }

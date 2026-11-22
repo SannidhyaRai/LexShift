@@ -18,7 +18,8 @@ const EXAMPLES = [
 const OWNER = { rel: "M1", cont: "M2", health: "M3", auth: "M3" };
 const NEGATIVE = ["overruled", "doubted", "criticised", "criticized"];
 
-export const state = { data: null, config: "full", k: 10, query: "", date: "", seq: 0, open: new Set() };
+export const state = { data: null, config: "full", k: 10, query: "", date: "", seq: 0, open: new Set(), cluster: null };
+const CONFIGS = ["b0", "b1", "full", "full_hits", "full_tiered"];
 const els = {};
 
 // ------------------------------------------------------------------------------------------------------------- the formula
@@ -122,6 +123,7 @@ function resultItem(r, name, block, list) {
         r.date ? h("span", {}, formatDate(r.date)) : null,
         r.bench_size ? h("span", {}, `${r.bench_size}-judge bench`) : null,
         moveBadge(r, name),
+        r.cluster ? h("span", { class: "chip chip-cluster", dataset: { tip: `Topic cluster ${r.cluster.id} (K-means over tf-idf vectors)` } }, r.cluster.label) : null,
         r.health < 0.999 ? h("span", { class: `chip st-${negative ? String(negative.label).toLowerCase() : "lowered"}` }, negative ? String(negative.label).toLowerCase() : "treatment lowered") : null,
       ]),
     ]),
@@ -159,20 +161,72 @@ function header() {
   show(els.stub, block.stubbed.length > 0);
   if (block.stubbed.length) els.stub.textContent = `Stub mode: ${block.stubbed.map((s) => SIGNAL_LABEL[s]).join(", ")} come from fixed-value stand-ins, not from real data. What is shown here is not a result.`;
   show(els.error, false);
+  if (block.candidate_source && block.candidate_source !== "exact") {
+    els.sub.textContent += `  ·  candidates from the ${block.candidate_source} index: ${block.candidates}`;
+  }
+}
+
+// ------------------------------------------------------------------------------------------------------------- Phase 2 panels
+/** "Did you mean" (M1's spelling correction) and what each wildcard expanded to (M1's k-gram index). */
+function renderTolerant() {
+  const data = state.data;
+  const parts = [];
+  if (data.suggestion) {
+    parts.push("Did you mean ", h("button", { class: "link-btn", type: "button", onclick: () => { els.q.value = data.suggestion; run({ scroll: false }); } }, data.suggestion), "?");
+  }
+  for (const [pattern, words] of Object.entries(data.wildcards || {})) {
+    if (parts.length) parts.push("  ·  ");
+    parts.push(h("span", { class: "mono" }, pattern), words.length ? ` matched ${words.slice(0, 8).join(", ")}${words.length > 8 ? ", ..." : ""}` : " matched no word in the corpus");
+  }
+  els.tolerant.replaceChildren(...parts);
+  show(els.tolerant, parts.length > 0);
+}
+
+/** One chip per topic cluster among the shown results; a chip filters the list to that cluster. */
+function renderFacets(block) {
+  const counts = new Map();
+  for (const r of block.results) if (r.cluster) {
+    const c = counts.get(r.cluster.id) || { label: r.cluster.label, n: 0 };
+    c.n += 1;
+    counts.set(r.cluster.id, c);
+  }
+  if (state.cluster !== null && !counts.has(state.cluster)) state.cluster = null;
+  const chips = [...counts.entries()].sort((a, b) => b[1].n - a[1].n || a[0] - b[0]).map(([id, c]) =>
+    h("button", { class: `chip-btn${state.cluster === id ? " is-on" : ""}`, type: "button", "aria-pressed": String(state.cluster === id),
+      onclick: () => { state.cluster = state.cluster === id ? null : id; renderList(); } }, [c.label, h("small", {}, String(c.n))]));
+  els.facets.replaceChildren(...(chips.length > 1 ? [h("span", { class: "note" }, "Topics:"), ...chips] : []));
+  show(els.facets, chips.length > 1);
+}
+
+function renderHubs() {
+  const hubs = state.data.hubs || [];
+  show(els.hubs, hubs.length > 0);
+  els.hubsList.replaceChildren(...hubs.map((x) => h("li", {}, [
+    h("button", { class: "link-btn", type: "button", onclick: () => openReader(x.doc_id, x.title || "", state.query) }, x.title || x.doc_id),
+    h("span", { class: "note" }, `  ${x.date ? formatDate(x.date) + "  ·  " : ""}hub ${f2(x.hub)}`),
+  ])));
 }
 
 function renderList({ flip = false } = {}) {
   const data = state.data;
   if (!data) return;
-  $$("#ladder button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.config === state.config)));
+  $$("#ladder button").forEach((b) => {
+    b.hidden = !(b.dataset.config in data.configs);
+    b.setAttribute("aria-checked", String(b.dataset.config === state.config));
+  });
+  if (!(state.config in data.configs)) state.config = "full";
   header();
+  renderTolerant();
+  renderHubs();
   const block = data.configs[state.config];
+  renderFacets(block);
   if (!block.results.length) {
     els.main.replaceChildren(h("li", { class: "empty" }, [h("strong", {}, "No judgment matched this query"), "Try fewer words, a section such as BNS 103, or a Boolean query such as murder AND intention."]));
     return;
   }
-  const list = block.results.map((r) => ({ doc_id: r.doc_id, title: r.title }));
-  const build = () => els.main.replaceChildren(...block.results.map((r) => resultItem(r, state.config, block, list)));
+  const shown = state.cluster === null ? block.results : block.results.filter((r) => r.cluster && r.cluster.id === state.cluster);
+  const list = shown.map((r) => ({ doc_id: r.doc_id, title: r.title }));
+  const build = () => els.main.replaceChildren(...shown.map((r) => resultItem(r, state.config, block, list)));
   if (flip) flipSwap(els.main, build);
   else { build(); animateIn(els.main.children, { stagger: 0.03 }); }
 }
@@ -182,6 +236,9 @@ function showError(message) {
   els.error.textContent = message;
   show(els.error, true);
   show(els.stub, false);
+  show(els.tolerant, false);
+  show(els.facets, false);
+  show(els.hubs, false);
   els.main.replaceChildren();
 }
 
@@ -200,6 +257,7 @@ export async function run({ scroll = true } = {}) {
   state.query = q;
   state.date = els.date.value || "";
   state.open.clear();
+  state.cluster = null;
   show(els.workspace, true);
   show(els.error, false);
   els.title.textContent = q;
@@ -256,7 +314,7 @@ export function applyParams(params, { scroll = false } = {}) {
   if (!q) return false;
   els.q.value = q;
   els.date.value = params.get("date") || "";
-  state.config = ["b0", "b1", "full"].includes(params.get("config")) ? params.get("config") : "full";
+  state.config = CONFIGS.includes(params.get("config")) ? params.get("config") : "full";
   run({ scroll });
   return true;
 }
@@ -265,6 +323,7 @@ export function initSearch() {
   Object.assign(els, {
     form: $("#search-form"), q: $("#q"), date: $("#date"), btn: $("#btn-search"), workspace: $("#workspace"),
     title: $("#ws-title"), sub: $("#ws-sub"), stub: $("#ws-stub"), error: $("#ws-error"), main: $("#ws-main"),
+    tolerant: $("#ws-tolerant"), facets: $("#ws-facets"), hubs: $("#ws-hubs"), hubsList: $("#ws-hubs-list"),
   });
   els.form.addEventListener("submit", (e) => { e.preventDefault(); run(); });
   $$("#ladder button").forEach((b) => b.addEventListener("click", () => setConfig(b.dataset.config)));
