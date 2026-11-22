@@ -619,6 +619,41 @@ What the Phase 2 guide asks of M1, built in `m1_index/dictionary.py`, `m1_index/
 * **Shared files not changed yet.** The guide's config keys (`tolerant: {kgram_k: 3, spell_max_edit: 2}` and the others above) live as
   defaults in `m1_index.dictionary.DEFAULTS`; `settings()` reads a `tolerant:` section of `common/config.yaml` if one is added. Flagged stubs of
   `expand_wildcard`, `suggest` and `soundex` in `stubs/fixed.py` are also pending: both are shared files and wait for the team's agreement.
+### D-040 (2026-11-20) M3 Phase 2: Naive Bayes, Rocchio, kNN and HITS (branch `m3-treatment`)
+
+Built from the Phase 2 guide (16 November 2026), M3 block. Additive only: `health()`, `authority()` and every existing file format are unchanged.
+
+* **New functions, as in the guide's section 4.** `classify_nb(window)` in `m3_treatment/nb.py`, `classify_rocchio(window)` and `classify_knn(window, k=5)` in `m3_treatment/vector_classifiers.py`, `hits(root_doc_ids, iterations=50)` in
+  `m3_treatment/hits.py`, each with a flagged stub in `stubs/fixed.py`. `common/providers.py` is not touched: none of these is a ranking signal yet. Shared files edited: `stubs/fixed.py` (the four stubs, as the guide prescribes)
+  and the `m3_treatment:` section of `common/config.yaml` (new keys `silver`, `preds`, `classifiers`, `hits`). `full_hits` under `ranking.configs` is M4's to add; `hits()` returns authorities in [0, 1], ready for it.
+* **Training data = silver, test data = gold only.** The training set is every distinct window with a cached zero-shot answer from the configured model (`gemini-3.5-flash-lite`): 1,165 windows (neutral 570, followed 372,
+  overruled 140, doubted 65, distinguished 18), written to `data/llm_labels/m3_silver.jsonl` (committed, 1.2 MB, so the classifiers train without re-extracting 220,388 mentions). The 160 older `gemini-2.5-flash` rows are not used:
+  another model. Every window in `data/treatment_gold.csv` is removed from training (`excluded_because_in_gold` in the reports), and the F1 table is computed only against hand labels. **The gold set is still empty**, so
+  `python -m m3_treatment.compare evaluate` refuses with that reason, and no F1 figure exists yet. The blank sheets for it were generated (`python -m m3_treatment.gold sample --n 250 --double 60`: 250 windows, 50 per cue bucket,
+  60 shared with the second labeller, in `data/labelling/`). Labelling them is a human task.
+* **The silver set is skewed (limitation, not measured on gold yet).** It covers only the `cued` scope (D-038): every training window has an overrule or doubt cue near the citation, including the ones labelled followed. A hand-written
+  "We are in respectful agreement with ... and follow it" is labelled overruled by Rocchio and kNN and neutral by NB. On the gold set's `follow` and `none` buckets we expect the course classifiers to do worse than the LLM. The gold F1
+  table will say by how much.
+* **Features.** M1's `tokenize()` (the guide: "reuse M1's tokenizer so the vectors match the index"), with two changes made in our own code: the target mention is replaced by one placeholder token, so party names never become
+  features, and the text within 150 characters of the target is added a second time with an `n:` prefix, so the position of a cue relative to the target is learnable. tf-idf is ltc (1 + log10 tf times log10 N/df, cosine-normalised),
+  with idf fitted on training windows only. **Known cost:** M1's stop list removes "not" and "no", so "not good law" and "good law" share features. Kept as M1 ships it; recorded here instead of forking the tokenizer.
+* **Model selection by 5-fold stratified CV on the training data only** (`reports/model_selection.md`, seed 0, 7 s). It measures agreement with the silver labels, not accuracy. Chosen: NB = **Bernoulli, MI, k = 50** (macro-F1 0.561);
+  best multinomial is MI, k = 50 (0.517); kNN **k = 3** (0.525, from {1, 3, 5, 7}); Rocchio 0.555. The Bernoulli result looks like it contradicts the textbook, but it does not. With all terms Bernoulli is the worst setting (0.328 against
+  multinomial's 0.452), because every absent term of a long window counts as evidence (IIR 13.3). With only 50 MI-selected terms there are few absences to count, and presence or absence of a cue near the target is what decides.
+  chi-square at small k is poor (0.29 to 0.37 at k = 50), consistent with IIR 13.5: chi-square favours rare terms, which are unreliable on 1,165 windows. The contract fixes `classify_knn`'s default at k = 5; the F1 table and
+  `treatment_preds.jsonl` use the CV choice.
+* **kNN is an inverted-index search.** Neighbours are found by term-at-a-time accumulation over postings of the training vectors plus a heap, as the index scores documents. Votes are weighted by cosine.
+* **`treatment_preds.jsonl`** (`data/processed/`, rebuilt by `python -m m3_treatment.compare preds`): for every silver window, the OUT-OF-FOLD label of LR, NB, Rocchio and kNN plus the LLM's own label (5,825 records). Once a
+  gold set exists, it also holds every classifier's label for each gold evaluation window. Extra key `split` (`silver`, `silver_oof`, `gold`).
+* **HITS.** It uses the same edges as PageRank (resolved, non-appeal, followed or neutral; 9,443 distinct pairs), unweighted as Kleinberg defines it. The base set is the root set (top 30 of `search()`) plus everything a root
+  judgment cites plus at most d = 50 citing judgments per root (sorted doc_id, so it is reproducible). On the whole graph, HITS and PageRank disagree strongly: top-10 overlap 0.00, top-100 overlap 0.14, Kendall tau-b 0.158 over the 2,436 cited
+  judgments. The top authorities are the death-sentence line (*Swamy Shraddananda*, *Bariyar*, *Sangeet*, *Khade*), and the top hubs are the sentencing judgments that survey them (*Mukesh*, *Manoj*). That is the tightly-knit
+  community effect of HITS (IIR 21.3). Per dev query (`reports/hits_vs_pagerank.md`): base sets of 92 to 224 judgments, under 30 ms per query with the graph in memory (loaded once in about 0.7 s), mean overlap@10 with PageRank
+  0.29, mean tau-b 0.48. **Topic drift is visible despite d:** for dev06 (section 377) the top hubs are those sentencing judgments, which enter as citers of a root judgment. Four of the ten queries (dev02, dev03, dev04, dev08) stop at the 50-iteration cap before
+  tol 1e-8. The top-10 authorities, in order, equal those of a run to convergence for 10 of 10 queries (computed in the report). dev09 and dev10 have the same text ("section 80"), so their rows are identical. Only dev queries are used.
+* **Libraries.** NB, Rocchio, kNN, tf-idf, MI, chi-square, stratified folds, HITS and Kendall tau-b are our own code (standard library only; numpy is not imported). scikit-learn and SciPy appear only in
+  `tests/test_m3_phase2.py` as cross-checks: our NB posteriors equal `sklearn.naive_bayes.MultinomialNB`/`BernoulliNB` to 1e-6, our kNN neighbours equal `NearestNeighbors(metric="cosine")`, and our tau-b equals
+  `scipy.stats.kendalltau`. The tests also reproduce IIR examples 13.1 to 13.4 and the analytic HITS eigenvector of a three-edge graph. LR stays the existing scikit-learn baseline. No new requirement.
 
 ## Open questions
 

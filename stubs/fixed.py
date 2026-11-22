@@ -71,3 +71,25 @@ def authority(doc_id: str) -> float:
     """M3 stand-in."""
     row = _TABLE.get(doc_id)
     return row[3] if row else 0.0
+
+
+# --- Phase 2 additions (additive contract, Phase 2 guide section 4). Same rules: fixed values, never evidence. ---
+def classify_nb(window: str) -> tuple[str, float]:
+    """M3 stand-in for m3_treatment.nb.classify_nb: always neutral with confidence 0 (= not classified)."""
+    return "neutral", 0.0
+
+
+def classify_rocchio(window: str) -> tuple[str, float]:
+    """M3 stand-in for m3_treatment.vector_classifiers.classify_rocchio."""
+    return "neutral", 0.0
+
+
+def classify_knn(window: str, k: int = 5) -> tuple[str, float]:
+    """M3 stand-in for m3_treatment.vector_classifiers.classify_knn."""
+    return "neutral", 0.0
+
+
+def hits(root_doc_ids: list[str], iterations: int = 50) -> tuple[dict[str, float], dict[str, float]]:
+    """M3 stand-in for m3_treatment.hits.hits: (hubs, authorities) from the fixed table, hubs all 0."""
+    auth = {d: (_TABLE[d][3] if d in _TABLE else 0.0) for d in root_doc_ids}
+    return {d: 0.0 for d in root_doc_ids}, auth

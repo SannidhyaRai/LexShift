@@ -1,0 +1,793 @@
+{
+  "graph_load_seconds": 0.729,
+  "config": {
+    "root_n": 30,
+    "max_in_per_root": 50,
+    "iterations": 50,
+    "tol": 1e-08
+  },
+  "global": {
+    "nodes": 4819,
+    "edges": 9443,
+    "with_in_links": 2436,
+    "iterations": 52,
+    "seconds": 0.39,
+    "overlap": {
+      "10": 0.0,
+      "50": 0.12,
+      "100": 0.14
+    },
+    "overlap_vs_shipped_authority": {
+      "10": 0.0,
+      "50": 0.12,
+      "100": 0.14
+    },
+    "kendall_tau_b_cited": 0.15780900895447766,
+    "top_authorities": [
+      {
+        "doc_id": "2008_11_93_144_EN",
+        "title": "Swamy Shraddananda @ Murali Manohar Mishra v. State of Karnataka",
+        "hits": 1.0,
+        "pagerank_rank": 43
+      },
+      {
+        "doc_id": "2009_9_90_182_EN",
+        "title": "Santosh Kumar Satishbhushan Bariyar v. State of Maharashtra",
+        "hits": 0.8064,
+        "pagerank_rank": 31
+      },
+      {
+        "doc_id": "2012_13_85_128_EN",
+        "title": "Sangeet & Anr. v. State of Haryana",
+        "hits": 0.5851,
+        "pagerank_rank": 171
+      },
+      {
+        "doc_id": "2013_6_949_1053_EN",
+        "title": "Shankar Kisanrao Khade v. State of Maharashtra",
+        "hits": 0.4989,
+        "pagerank_rank": 212
+      },
+      {
+        "doc_id": "2008_11_184_210_EN",
+        "title": "Bantu v. The State of U.P.",
+        "hits": 0.3995,
+        "pagerank_rank": 148
+      },
+      {
+        "doc_id": "2012_3_630_685_EN",
+        "title": "Ramnaresh & Ors. v. State of Chhattisgarh",
+        "hits": 0.3541,
+        "pagerank_rank": 166
+      },
+      {
+        "doc_id": "2011_14_921_944_EN",
+        "title": "Haresh Mohandas Rajput v. State of Maharashtra",
+        "hits": 0.3366,
+        "pagerank_rank": 317
+      },
+      {
+        "doc_id": "2012_5_952_993_EN",
+        "title": "Sandeep v. State of U.P.",
+        "hits": 0.3189,
+        "pagerank_rank": 206
+      },
+      {
+        "doc_id": "2012_1_1009_1022_EN",
+        "title": "Amit v. State of Uttar Pradesh",
+        "hits": 0.3148,
+        "pagerank_rank": 551
+      },
+      {
+        "doc_id": "S_2006_10_662_728_EN",
+        "title": "Aloke Nath Dutta and Ors. v. State of West Bengal",
+        "hits": 0.3143,
+        "pagerank_rank": 35
+      }
+    ],
+    "top_hubs": [
+      {
+        "doc_id": "2017_6_1_324_EN",
+        "title": "Mukesh & Anr. v. State for NCT of Delhi & Ors.",
+        "hub": 1.0,
+        "cites": 92
+      },
+      {
+        "doc_id": "2022_9_452_580_EN",
+        "title": "Manoj & Ors. v. State of Madhya Pradesh",
+        "hub": 0.6754,
+        "cites": 53
+      },
+      {
+        "doc_id": "2013_6_949_1053_EN",
+        "title": "Shankar Kisanrao Khade v. State of Maharashtra",
+        "hub": 0.5287,
+        "cites": 30
+      },
+      {
+        "doc_id": "2018_14_585_626_EN",
+        "title": "Rajendra Pralhadrao Wasnik v. State of Maharashtra",
+        "hub": 0.4295,
+        "cites": 23
+      },
+      {
+        "doc_id": "2020_13_1_128_EN",
+        "title": "Shatrughna Baban Meshram v. State of Maharashtra",
+        "hub": 0.414,
+        "cites": 34
+      },
+      {
+        "doc_id": "2022_2_13_101_EN",
+        "title": "Pappu v. The State of Uttar Pradesh",
+        "hub": 0.3257,
+        "cites": 22
+      },
+      {
+        "doc_id": "2019_18_1007_1077_EN",
+        "title": "Manoharan v. State by Inspector of Police, Variety Hall Police Station, Coimbatore",
+        "hub": 0.3029,
+        "cites": 14
+      },
+      {
+        "doc_id": "2014_3_34_63_EN",
+        "title": "Anil @ Anthony Arikswamy Joseph v. State of Maharashtra",
+        "hub": 0.2924,
+        "cites": 17
+      },
+      {
+        "doc_id": "2023_4_748_772_EN",
+        "title": "Vikas Chaudhary v. The State of Delhi",
+        "hub": 0.2812,
+        "cites": 13
+      },
+      {
+        "doc_id": "2013_14_361_395_EN",
+        "title": "State of Rajasthan v. Jamil Khan",
+        "hub": 0.2787,
+        "cites": 18
+      }
+    ]
+  },
+  "per_query": [
+    {
+      "qid": "dev01",
+      "query": "punishment for murder under section 103 BNS",
+      "root": 30,
+      "base": 224,
+      "edges": 637,
+      "iterations": 20,
+      "top10_same_as_converged": true,
+      "ms": 5.1,
+      "overlap@10": 0.3,
+      "kendall_tau_b": 0.33609175718433804,
+      "top_authorities": [
+        {
+          "doc_id": "2009_9_90_182_EN",
+          "title": "Santosh Kumar Satishbhushan Bariyar v. State of Maharashtra",
+          "score": 1.0,
+          "in_root": false
+        },
+        {
+          "doc_id": "2008_11_93_144_EN",
+          "title": "Swamy Shraddananda @ Murali Manohar Mishra v. State of Karnataka",
+          "score": 0.8581,
+          "in_root": false
+        },
+        {
+          "doc_id": "2012_13_85_128_EN",
+          "title": "Sangeet & Anr. v. State of Haryana",
+          "score": 0.6171,
+          "in_root": false
+        },
+        {
+          "doc_id": "2008_11_184_210_EN",
+          "title": "Bantu v. The State of U.P.",
+          "score": 0.5866,
+          "in_root": false
+        },
+        {
+          "doc_id": "S_2006_10_662_728_EN",
+          "title": "Aloke Nath Dutta and Ors. v. State of West Bengal",
+          "score": 0.5252,
+          "in_root": false
+        }
+      ],
+      "top_hubs": [
+        {
+          "doc_id": "2022_9_452_580_EN",
+          "title": "Manoj & Ors. v. State of Madhya Pradesh",
+          "score": 1.0,
+          "in_root": false
+        },
+        {
+          "doc_id": "2017_6_1_324_EN",
+          "title": "Mukesh & Anr. v. State for NCT of Delhi & Ors.",
+          "score": 0.9625,
+          "in_root": false
+        },
+        {
+          "doc_id": "2018_14_585_626_EN",
+          "title": "Rajendra Pralhadrao Wasnik v. State of Maharashtra",
+          "score": 0.8171,
+          "in_root": false
+        }
+      ]
+    },
+    {
+      "qid": "dev02",
+      "query": "cheating and dishonestly inducing delivery of property BNS 318",
+      "root": 30,
+      "base": 117,
+      "edges": 194,
+      "iterations": 50,
+      "top10_same_as_converged": true,
+      "ms": 5.5,
+      "overlap@10": 0.3,
+      "kendall_tau_b": 0.4944035290007096,
+      "top_authorities": [
+        {
+          "doc_id": "2021_4_1044_1099_EN",
+          "title": "Neeharika Infrastructure Pvt. Ltd. v. State of Maharashtra and Others",
+          "score": 1.0,
+          "in_root": false
+        },
+        {
+          "doc_id": "2007_10_847_871_EN",
+          "title": "Inder Mohan Goswami and Anr. v. State of Uttaranchal and Ors.",
+          "score": 0.9709,
+          "in_root": false
+        },
+        {
+          "doc_id": "2015_4_27_36_EN",
+          "title": "Vesa Holdings P. Ltd. & Anr. v. State of Kerala & Ors.",
+          "score": 0.9537,
+          "in_root": false
+        },
+        {
+          "doc_id": "2008_17_588_605_EN",
+          "title": "V.Y. Jose & Anr. v. State of Gujarat & Anr.",
+          "score": 0.7734,
+          "in_root": true
+        },
+        {
+          "doc_id": "2011_13_309_346_EN",
+          "title": "Sanjay Chandra v. CBI",
+          "score": 0.6162,
+          "in_root": true
+        }
+      ],
+      "top_hubs": [
+        {
+          "doc_id": "2025_7_1928_1955_EN",
+          "title": "S.N. Vijaylakshmi & Ors. v. State of Karnataka & Anr.",
+          "score": 1.0,
+          "in_root": true
+        },
+        {
+          "doc_id": "2020_1_582_601_EN",
+          "title": "Sushil Sethi and Another v. The State of Arunachal Pradesh and Others",
+          "score": 0.6744,
+          "in_root": false
+        },
+        {
+          "doc_id": "2022_1_884_912_EN",
+          "title": "Vijay Kumar Ghai & Ors. v. The State of West Bengal & Ors.",
+          "score": 0.5889,
+          "in_root": true
+        }
+      ]
+    },
+    {
+      "qid": "dev03",
+      "query": "presumption of dowry death BNS 80",
+      "root": 30,
+      "base": 92,
+      "edges": 169,
+      "iterations": 50,
+      "top10_same_as_converged": true,
+      "ms": 4.6,
+      "overlap@10": 0.4,
+      "kendall_tau_b": 0.5346686714548499,
+      "top_authorities": [
+        {
+          "doc_id": "2005_1_903_912_EN",
+          "title": "Kamesh Panjiyar @ Kamlesh Panjiyar v. State of Bihar",
+          "score": 1.0,
+          "in_root": true
+        },
+        {
+          "doc_id": "2009_5_567_576_EN",
+          "title": "Hira Lal & Ors. v. State of U.P. & Ors.",
+          "score": 0.9727,
+          "in_root": false
+        },
+        {
+          "doc_id": "2007_1_164_173_EN",
+          "title": "Appasaheb and Anr. v. State of Maharashtra",
+          "score": 0.4575,
+          "in_root": false
+        },
+        {
+          "doc_id": "2017_3_458_486_EN",
+          "title": "Pawan Kumar v. State of H.P.",
+          "score": 0.3729,
+          "in_root": false
+        },
+        {
+          "doc_id": "S_2005_5_629_641_EN",
+          "title": "Harjit Singh v. State of Punjab",
+          "score": 0.316,
+          "in_root": true
+        }
+      ],
+      "top_hubs": [
+        {
+          "doc_id": "2009_6_525_550_EN",
+          "title": "Kanti Lal v. State of Rajasthan",
+          "score": 1.0,
+          "in_root": true
+        },
+        {
+          "doc_id": "2013_14_685_712_EN",
+          "title": "Suresh Kumar v. State of Haryana",
+          "score": 0.9887,
+          "in_root": true
+        },
+        {
+          "doc_id": "2008_8_403_421_EN",
+          "title": "Narayanamurthy v. State of Karnataka and Anr.",
+          "score": 0.6593,
+          "in_root": false
+        }
+      ]
+    },
+    {
+      "qid": "dev04",
+      "query": "offence of sedition",
+      "root": 30,
+      "base": 167,
+      "edges": 278,
+      "iterations": 50,
+      "top10_same_as_converged": true,
+      "ms": 8.7,
+      "overlap@10": 0.3,
+      "kendall_tau_b": 0.4512946860547971,
+      "top_authorities": [
+        {
+          "doc_id": "2013_14_713_802_EN",
+          "title": "Lalita Kumari v. Govt. of U.P. and Ors.",
+          "score": 1.0,
+          "in_root": false
+        },
+        {
+          "doc_id": "2014_8_128_143_EN",
+          "title": "Arnesh Kumar v. State of Bihar & Anr.",
+          "score": 0.7922,
+          "in_root": false
+        },
+        {
+          "doc_id": "S_1962_2_769_812_EN",
+          "title": "Kedar Nath Singh v. State of Bihar",
+          "score": 0.7296,
+          "in_root": true
+        },
+        {
+          "doc_id": "2018_4_877_954_EN",
+          "title": "Dr. Subhash Kashinath Mahajan v. The State of Maharashtra and Anr.",
+          "score": 0.7187,
+          "in_root": true
+        },
+        {
+          "doc_id": "2019_12_1125_1178_EN",
+          "title": "Union of India v. State of Maharashtra and Ors.",
+          "score": 0.5692,
+          "in_root": false
+        }
+      ],
+      "top_hubs": [
+        {
+          "doc_id": "2021_12_1071_1177_EN",
+          "title": "Vinod Dua v. Union of India & Ors.",
+          "score": 1.0,
+          "in_root": true
+        },
+        {
+          "doc_id": "2018_4_877_954_EN",
+          "title": "Dr. Subhash Kashinath Mahajan v. The State of Maharashtra and Anr.",
+          "score": 0.7185,
+          "in_root": true
+        },
+        {
+          "doc_id": "2021_13_364_423_EN",
+          "title": "Bureau of Investigation (Cbi) and Anr. v. Thommandru Hannah Vijayalakshmi @ T. H. Vijayalakshmi and Anr.",
+          "score": 0.3928,
+          "in_root": false
+        }
+      ]
+    },
+    {
+      "qid": "dev05",
+      "query": "attempt to commit suicide is punishable",
+      "root": 30,
+      "base": 99,
+      "edges": 201,
+      "iterations": 21,
+      "top10_same_as_converged": true,
+      "ms": 2.3,
+      "overlap@10": 0.2,
+      "kendall_tau_b": 0.5271057691366976,
+      "top_authorities": [
+        {
+          "doc_id": "2009_15_836_850_EN",
+          "title": "Amalendu Pal @ Jhantu v. State of West Bengal",
+          "score": 1.0,
+          "in_root": false
+        },
+        {
+          "doc_id": "2009_13_230_244_EN",
+          "title": "Chitresh Kumar Chopra v. State (Govt. of NCT of Delhi)",
+          "score": 0.6867,
+          "in_root": true
+        },
+        {
+          "doc_id": "2019_9_703_734_EN",
+          "title": "Ude Singh & Ors. v. State of Haryana",
+          "score": 0.5875,
+          "in_root": true
+        },
+        {
+          "doc_id": "2010_10_351_361_EN",
+          "title": "Madan Mohan Singh v. State of Gujarat and Anr.",
+          "score": 0.5557,
+          "in_root": false
+        },
+        {
+          "doc_id": "2011_3_437_470_EN",
+          "title": "M. Mohan v. The State Represented by the Deputy Superintendent of Police",
+          "score": 0.5461,
+          "in_root": true
+        }
+      ],
+      "top_hubs": [
+        {
+          "doc_id": "2025_8_966_986_EN",
+          "title": "Abhinav Mohan Delkar v. The State of Maharashtra & Ors.",
+          "score": 1.0,
+          "in_root": true
+        },
+        {
+          "doc_id": "2020_11_896_947_EN",
+          "title": "Arnab Manoranjan Goswami v. The State of Maharashtra & Ors.",
+          "score": 0.8626,
+          "in_root": false
+        },
+        {
+          "doc_id": "2024_3_329_355_EN",
+          "title": "Kumar @ Shiva Kumar v. State of Karnataka",
+          "score": 0.8478,
+          "in_root": true
+        }
+      ]
+    },
+    {
+      "qid": "dev06",
+      "query": "consensual same-sex relations section 377",
+      "root": 30,
+      "base": 133,
+      "edges": 332,
+      "iterations": 17,
+      "top10_same_as_converged": true,
+      "ms": 2.6,
+      "overlap@10": 0.2,
+      "kendall_tau_b": 0.4476173140975279,
+      "top_authorities": [
+        {
+          "doc_id": "2009_9_90_182_EN",
+          "title": "Santosh Kumar Satishbhushan Bariyar v. State of Maharashtra",
+          "score": 1.0,
+          "in_root": false
+        },
+        {
+          "doc_id": "2008_11_93_144_EN",
+          "title": "Swamy Shraddananda @ Murali Manohar Mishra v. State of Karnataka",
+          "score": 0.9995,
+          "in_root": false
+        },
+        {
+          "doc_id": "2013_6_949_1053_EN",
+          "title": "Shankar Kisanrao Khade v. State of Maharashtra",
+          "score": 0.8315,
+          "in_root": false
+        },
+        {
+          "doc_id": "2008_11_184_210_EN",
+          "title": "Bantu v. The State of U.P.",
+          "score": 0.8187,
+          "in_root": false
+        },
+        {
+          "doc_id": "2012_13_85_128_EN",
+          "title": "Sangeet & Anr. v. State of Haryana",
+          "score": 0.7285,
+          "in_root": false
+        }
+      ],
+      "top_hubs": [
+        {
+          "doc_id": "2017_6_1_324_EN",
+          "title": "Mukesh & Anr. v. State for NCT of Delhi & Ors.",
+          "score": 1.0,
+          "in_root": false
+        },
+        {
+          "doc_id": "2022_9_452_580_EN",
+          "title": "Manoj & Ors. v. State of Madhya Pradesh",
+          "score": 0.9874,
+          "in_root": false
+        },
+        {
+          "doc_id": "2014_3_34_63_EN",
+          "title": "Anil @ Anthony Arikswamy Joseph v. State of Maharashtra",
+          "score": 0.9005,
+          "in_root": true
+        }
+      ]
+    },
+    {
+      "qid": "dev07",
+      "query": "anticipatory bail protection limited to a fixed period section 438",
+      "root": 30,
+      "base": 130,
+      "edges": 261,
+      "iterations": 27,
+      "top10_same_as_converged": true,
+      "ms": 3.8,
+      "overlap@10": 0.6,
+      "kendall_tau_b": 0.4921396717105048,
+      "top_authorities": [
+        {
+          "doc_id": "2010_15_201_274_EN",
+          "title": "Siddharam Satlingappa Mhetre v. State of Maharashtra and Others",
+          "score": 1.0,
+          "in_root": true
+        },
+        {
+          "doc_id": "2005_2_188_199_EN",
+          "title": "Adri Dharan Das v. State of West Bengal",
+          "score": 0.4277,
+          "in_root": true
+        },
+        {
+          "doc_id": "2014_8_128_143_EN",
+          "title": "Arnesh Kumar v. State of Bihar & Anr.",
+          "score": 0.3913,
+          "in_root": false
+        },
+        {
+          "doc_id": "2024_5_629_729_EN",
+          "title": "Sunita Devi v. The State of Bihar & Anr.",
+          "score": 0.311,
+          "in_root": false
+        },
+        {
+          "doc_id": "2013_14_713_802_EN",
+          "title": "Lalita Kumari v. Govt. of U.P. and Ors.",
+          "score": 0.2777,
+          "in_root": false
+        }
+      ],
+      "top_hubs": [
+        {
+          "doc_id": "2020_2_1_131_EN",
+          "title": "Sushila Aggarwal and Others v. State (NCT of Delhi) and Another",
+          "score": 1.0,
+          "in_root": true
+        },
+        {
+          "doc_id": "2018_4_877_954_EN",
+          "title": "Dr. Subhash Kashinath Mahajan v. The State of Maharashtra and Anr.",
+          "score": 0.736,
+          "in_root": true
+        },
+        {
+          "doc_id": "2018_6_825_852_EN",
+          "title": "Sushila Aggarwal & Ors. v. State (NCT of Delhi) & Anr.",
+          "score": 0.5672,
+          "in_root": false
+        }
+      ]
+    },
+    {
+      "qid": "dev08",
+      "query": "arrest guidelines family welfare committee section 498A",
+      "root": 30,
+      "base": 112,
+      "edges": 198,
+      "iterations": 50,
+      "top10_same_as_converged": true,
+      "ms": 7.7,
+      "overlap@10": 0.2,
+      "kendall_tau_b": 0.5196298093586219,
+      "top_authorities": [
+        {
+          "doc_id": "2014_8_128_143_EN",
+          "title": "Arnesh Kumar v. State of Bihar & Anr.",
+          "score": 1.0,
+          "in_root": false
+        },
+        {
+          "doc_id": "2013_14_713_802_EN",
+          "title": "Lalita Kumari v. Govt. of U.P. and Ors.",
+          "score": 0.9149,
+          "in_root": false
+        },
+        {
+          "doc_id": "2017_9_529_543_EN",
+          "title": "Rajesh Sharma & Ors. v. State of U.P. & Anr.",
+          "score": 0.521,
+          "in_root": true
+        },
+        {
+          "doc_id": "2018_4_877_954_EN",
+          "title": "Dr. Subhash Kashinath Mahajan v. The State of Maharashtra and Anr.",
+          "score": 0.4033,
+          "in_root": false
+        },
+        {
+          "doc_id": "2010_9_1168_1188_EN",
+          "title": "Preeti Gupta & Another v. State of Jharkhand & Another",
+          "score": 0.3985,
+          "in_root": false
+        }
+      ],
+      "top_hubs": [
+        {
+          "doc_id": "2021_12_1071_1177_EN",
+          "title": "Vinod Dua v. Union of India & Ors.",
+          "score": 1.0,
+          "in_root": true
+        },
+        {
+          "doc_id": "2022_1_558_569_EN",
+          "title": "Kahkashan Kausar @ Sonam & Ors. v. State of Bihar & Ors.",
+          "score": 0.5563,
+          "in_root": false
+        },
+        {
+          "doc_id": "2018_12_19_50_EN",
+          "title": "Social Action Forum for Manav Adhikar and Another v. Union of India Ministry of Law and Justice and Others",
+          "score": 0.5381,
+          "in_root": true
+        }
+      ]
+    },
+    {
+      "qid": "dev09",
+      "query": "section 80",
+      "root": 30,
+      "base": 197,
+      "edges": 378,
+      "iterations": 45,
+      "top10_same_as_converged": true,
+      "ms": 12.8,
+      "overlap@10": 0.2,
+      "kendall_tau_b": 0.497737920647355,
+      "top_authorities": [
+        {
+          "doc_id": "2005_1_1132_1146_EN",
+          "title": "State of U.P. v. Satish",
+          "score": 1.0,
+          "in_root": false
+        },
+        {
+          "doc_id": "2009_9_90_182_EN",
+          "title": "Santosh Kumar Satishbhushan Bariyar v. State of Maharashtra",
+          "score": 0.7363,
+          "in_root": false
+        },
+        {
+          "doc_id": "2011_14_921_944_EN",
+          "title": "Haresh Mohandas Rajput v. State of Maharashtra",
+          "score": 0.7257,
+          "in_root": false
+        },
+        {
+          "doc_id": "2006_3_348_360_EN",
+          "title": "Ramreddy Rajeshkhanna Reddy and Anr. v. State of Andhra Pradesh",
+          "score": 0.7152,
+          "in_root": true
+        },
+        {
+          "doc_id": "2010_9_993_1024_EN",
+          "title": "Atbir v. Govt. of N.C.T. of Delhi",
+          "score": 0.6484,
+          "in_root": false
+        }
+      ],
+      "top_hubs": [
+        {
+          "doc_id": "2017_6_1_324_EN",
+          "title": "Mukesh & Anr. v. State for NCT of Delhi & Ors.",
+          "score": 1.0,
+          "in_root": false
+        },
+        {
+          "doc_id": "2014_10_812_842_EN",
+          "title": "Mofil Khan & Anr. v. State of Jharkhand",
+          "score": 0.9698,
+          "in_root": true
+        },
+        {
+          "doc_id": "2013_6_949_1053_EN",
+          "title": "Shankar Kisanrao Khade v. State of Maharashtra",
+          "score": 0.6925,
+          "in_root": false
+        }
+      ]
+    },
+    {
+      "qid": "dev10",
+      "query": "section 80",
+      "root": 30,
+      "base": 197,
+      "edges": 378,
+      "iterations": 45,
+      "top10_same_as_converged": true,
+      "ms": 8.6,
+      "overlap@10": 0.2,
+      "kendall_tau_b": 0.497737920647355,
+      "top_authorities": [
+        {
+          "doc_id": "2005_1_1132_1146_EN",
+          "title": "State of U.P. v. Satish",
+          "score": 1.0,
+          "in_root": false
+        },
+        {
+          "doc_id": "2009_9_90_182_EN",
+          "title": "Santosh Kumar Satishbhushan Bariyar v. State of Maharashtra",
+          "score": 0.7363,
+          "in_root": false
+        },
+        {
+          "doc_id": "2011_14_921_944_EN",
+          "title": "Haresh Mohandas Rajput v. State of Maharashtra",
+          "score": 0.7257,
+          "in_root": false
+        },
+        {
+          "doc_id": "2006_3_348_360_EN",
+          "title": "Ramreddy Rajeshkhanna Reddy and Anr. v. State of Andhra Pradesh",
+          "score": 0.7152,
+          "in_root": true
+        },
+        {
+          "doc_id": "2010_9_993_1024_EN",
+          "title": "Atbir v. Govt. of N.C.T. of Delhi",
+          "score": 0.6484,
+          "in_root": false
+        }
+      ],
+      "top_hubs": [
+        {
+          "doc_id": "2017_6_1_324_EN",
+          "title": "Mukesh & Anr. v. State for NCT of Delhi & Ors.",
+          "score": 1.0,
+          "in_root": false
+        },
+        {
+          "doc_id": "2014_10_812_842_EN",
+          "title": "Mofil Khan & Anr. v. State of Jharkhand",
+          "score": 0.9698,
+          "in_root": true
+        },
+        {
+          "doc_id": "2013_6_949_1053_EN",
+          "title": "Shankar Kisanrao Khade v. State of Maharashtra",
+          "score": 0.6925,
+          "in_root": false
+        }
+      ]
+    }
+  ]
+}

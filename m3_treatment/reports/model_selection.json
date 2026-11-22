@@ -1,0 +1,191 @@
+{
+  "note": "Model selection by stratified cross-validation on the TRAINING data (Gemini silver labels). The scores say how well each setting reproduces the silver labels; they are not an evaluation. The evaluation is against the hand-labelled gold set.",
+  "training": {
+    "windows": 1165,
+    "labels": {
+      "overruled": 140,
+      "neutral": 570,
+      "followed": 372,
+      "doubted": 65,
+      "distinguished": 18
+    },
+    "excluded_because_in_gold": 0,
+    "silver_sha256_16": "b275d12cda74102a",
+    "folds": 5,
+    "seed": 0
+  },
+  "nb": {
+    "variant": "bernoulli",
+    "selection": "mi",
+    "k": 50,
+    "cv_macro_f1": 0.5605296477945348
+  },
+  "best_bernoulli": {
+    "variant": "bernoulli",
+    "selection": "mi",
+    "k": 50,
+    "macro_f1": 0.5605296477945348
+  },
+  "knn": {
+    "k": 3,
+    "cv_macro_f1": 0.5247324182571792
+  },
+  "rocchio": {
+    "cv_macro_f1": 0.5554490701272934
+  },
+  "grid": {
+    "nb": [
+      {
+        "variant": "bernoulli",
+        "selection": "chi2",
+        "k": 50,
+        "macro_f1": 0.36598752957075004
+      },
+      {
+        "variant": "bernoulli",
+        "selection": "chi2",
+        "k": 100,
+        "macro_f1": 0.392423196914522
+      },
+      {
+        "variant": "bernoulli",
+        "selection": "chi2",
+        "k": 300,
+        "macro_f1": 0.4302737326799946
+      },
+      {
+        "variant": "bernoulli",
+        "selection": "chi2",
+        "k": 1000,
+        "macro_f1": 0.435074790496929
+      },
+      {
+        "variant": "bernoulli",
+        "selection": "chi2",
+        "k": 3000,
+        "macro_f1": 0.42219137891514213
+      },
+      {
+        "variant": "bernoulli",
+        "selection": "none",
+        "k": 0,
+        "macro_f1": 0.3280698424269587
+      },
+      {
+        "variant": "bernoulli",
+        "selection": "mi",
+        "k": 50,
+        "macro_f1": 0.5605296477945348
+      },
+      {
+        "variant": "bernoulli",
+        "selection": "mi",
+        "k": 100,
+        "macro_f1": 0.5032127445249828
+      },
+      {
+        "variant": "bernoulli",
+        "selection": "mi",
+        "k": 300,
+        "macro_f1": 0.45329549140572983
+      },
+      {
+        "variant": "bernoulli",
+        "selection": "mi",
+        "k": 1000,
+        "macro_f1": 0.4591044088871448
+      },
+      {
+        "variant": "bernoulli",
+        "selection": "mi",
+        "k": 3000,
+        "macro_f1": 0.4286479089085303
+      },
+      {
+        "variant": "multinomial",
+        "selection": "chi2",
+        "k": 50,
+        "macro_f1": 0.29304104821346205
+      },
+      {
+        "variant": "multinomial",
+        "selection": "chi2",
+        "k": 100,
+        "macro_f1": 0.30049195974211357
+      },
+      {
+        "variant": "multinomial",
+        "selection": "chi2",
+        "k": 300,
+        "macro_f1": 0.4573402001099172
+      },
+      {
+        "variant": "multinomial",
+        "selection": "chi2",
+        "k": 1000,
+        "macro_f1": 0.491149347697064
+      },
+      {
+        "variant": "multinomial",
+        "selection": "chi2",
+        "k": 3000,
+        "macro_f1": 0.47484480353673025
+      },
+      {
+        "variant": "multinomial",
+        "selection": "none",
+        "k": 0,
+        "macro_f1": 0.45235100754390034
+      },
+      {
+        "variant": "multinomial",
+        "selection": "mi",
+        "k": 50,
+        "macro_f1": 0.5171693682031215
+      },
+      {
+        "variant": "multinomial",
+        "selection": "mi",
+        "k": 100,
+        "macro_f1": 0.489485619929874
+      },
+      {
+        "variant": "multinomial",
+        "selection": "mi",
+        "k": 300,
+        "macro_f1": 0.45770083596391614
+      },
+      {
+        "variant": "multinomial",
+        "selection": "mi",
+        "k": 1000,
+        "macro_f1": 0.4538735632876856
+      },
+      {
+        "variant": "multinomial",
+        "selection": "mi",
+        "k": 3000,
+        "macro_f1": 0.47302440791528816
+      }
+    ],
+    "knn": [
+      {
+        "k": 1,
+        "macro_f1": 0.5224248918239156
+      },
+      {
+        "k": 3,
+        "macro_f1": 0.5247324182571792
+      },
+      {
+        "k": 5,
+        "macro_f1": 0.501483407992589
+      },
+      {
+        "k": 7,
+        "macro_f1": 0.4987972120381672
+      }
+    ]
+  },
+  "seconds": 4.3
+}
