@@ -655,6 +655,39 @@ Built from the Phase 2 guide (16 November 2026), M3 block. Additive only: `healt
   `tests/test_m3_phase2.py` as cross-checks: our NB posteriors equal `sklearn.naive_bayes.MultinomialNB`/`BernoulliNB` to 1e-6, our kNN neighbours equal `NearestNeighbors(metric="cosine")`, and our tau-b equals
   `scipy.stats.kendalltau`. The tests also reproduce IIR examples 13.1 to 13.4 and the analytic HITS eigenvector of a three-edge graph. LR stays the existing scikit-learn baseline. No new requirement.
 
+### D-041 (2026-11-22) M4 Phase 2: flat clustering, inexact top-K, HITS and tiered ablations, extended evaluation (branch `m4-rank`)
+
+* **K-means is ours** (`m4_rank/cluster.py`): k-means++ seeding, Lloyd iterations to no change (max 100), an empty cluster takes
+  the document farthest from its centroid, 3 seeded restarts with the lowest RSS kept. Vectors: tf-idf (1 + log10 tf, log10 N/df,
+  cosine-normalised) over the 2,000 most frequent index terms with 10 <= df <= 0.5 N, digits-only terms left out, read from M1's
+  postings arrays (so M1's tokenizer and stems). numpy is added to `requirements.txt` for the dense arrays; it does no IR itself.
+* **K = 12, by the elbow of the RSS curve** over K in {2, 4, ..., 30}. The textbook AIC (RSS + 2MK, M = 2,000) picks K = 2, the
+  smallest on the grid: with unit vectors RSS is at most N while the penalty grows by 2M per cluster. Both are reported; neither
+  looks at a label or a query. The curve is shallow (RSS falls 8.0% from K = 2 to 30), so the elbow is a weak preference.
+* **Cluster evaluation is against an automatic labelling**, each judgment's most-referenced offence in M2's `doc_statutes.jsonl`
+  (4,041 judgments, 37 classes; 778 without an offence are left out), and is labelled as such everywhere: purity 0.401, NMI
+  0.264. scikit-learn is a cross-check only: its NMI and Rand index of our clusters equal ours to 6 decimals, and its KMeans
+  reaches RSS 3810.57 against our 3802.68. Our metric code also reproduces IIR figure 16.4 exactly (tests).
+* **Labels** are differential centroid terms shown as their most frequent surface word (M1's surface dictionary). One cluster is
+  labelled with a judge's name: tf-idf over full judgments also groups by author and style. It is left visible, not hand-filtered.
+* **Inexact top-K** (`m4_rank/inexact.py`) scores a reduced candidate set with the same zone-weighted BM25 as `search()`,
+  bit-identical to it on the exact set (a test checks every hit, score and zone score), so differences come only from the choice of
+  candidates. g(d) = M3's authority(); champion key = g(d) + BM25 tf saturation; tier 1 = authority at or above its 0.8 quantile
+  or a bench of 3+ (1,391 judgments). Parameters are fixed in config, not tuned. Measured on the 10 judged dev queries (top 20,
+  BM25 only): index elimination 4.91x faster for -0.029 nDCG@10, champion lists 4.84x for -0.071, tiered 2.32x for -0.282, cluster
+  pruning 2.58x for -0.466. The qrels were pooled from exact systems, so unjudged documents make these losses pessimistic.
+  Operator queries and filters fall back to the exact `search()` and say so.
+* **`full_hits` and `full_tiered`** are additive configs (`ranking.configs`, with `ranking.variants` naming what differs). HITS
+  uses all 100 candidates as the root set, so every candidate is in the base set and gets an authority; about 0.05 s per query once
+  the citation graph is loaded. Both obey the stub switches (the HITS stub when `authority` is stubbed). `run_ablation` collects
+  once per variant and skips a Phase 2 config, printing why, when its real data source is absent (fake or foreign providers);
+  asked for explicitly, it refuses instead. Neither is the default.
+* **First dev ablation with the five configs** (untuned starting weights, every provider real): nDCG@10 b0 0.727, b1 0.736, full
+  0.732, full_hits 0.703, full_tiered 0.489. With 10 queries only full_tiered's difference from b0 has a bootstrap interval that
+  excludes zero. These are dev numbers with placeholder weights, not results; test qrels do not exist yet.
+* **Evaluation extras**: precision-recall points, 11-point interpolated precision and AP (AP11), R-precision and MRR in
+  `eval/metrics.py` (inside the evaluation depth, recall relative to the judged relevant set), a PR-curve plot per config.
+
 ## Open questions
 
 * **OQ-1** How is the 200-document sample shared with the team (committed under `data/sample/`, a release asset, or a shared

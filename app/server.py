@@ -149,6 +149,12 @@ class Handler(BaseHTTPRequestHandler):
             self._json(s.judge_rounds())
         elif path == "/api/judge/sheet":
             self._json(s.judge_sheet(_one(q, "round"), _one(q, "judge")))
+        elif path == "/api/clusters":
+            self._json(s.clusters())
+        elif path == "/api/cluster":
+            self._json(s.cluster(_one(q, "id"), _one(q, "n", "25")))
+        elif path == "/api/inexact":
+            self._json(s.inexact())
         elif path == "/api/m1/overview":
             self._json(s.m1_overview())
         elif path == "/api/m1/analyze":

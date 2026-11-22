@@ -115,11 +115,20 @@
             <button type="button" role="radio" data-config="b0" aria-checked="false">BM25 only</button>
             <button type="button" role="radio" data-config="b1" aria-checked="false">+ Continuity</button>
             <button type="button" role="radio" data-config="full" aria-checked="true">All four</button>
+            <button type="button" role="radio" data-config="full_hits" aria-checked="false" hidden title="Authority from HITS on this query's citation base set instead of PageRank">HITS</button>
+            <button type="button" role="radio" data-config="full_tiered" aria-checked="false" hidden title="Candidates from the tiered index (inexact top-K): faster, with a measured quality cost">Tiered</button>
           </div>
         </div>
         <div class="callout callout-warn" id="ws-stub" role="alert" hidden></div>
         <div class="callout callout-error" id="ws-error" role="alert" hidden></div>
+        <p class="tolerant" id="ws-tolerant" hidden></p>
+        <div class="chips facets" id="ws-facets" aria-label="Filter the results by topic cluster" hidden></div>
         <ol class="results" id="ws-main" aria-live="polite"></ol>
+        <section class="card hubs" id="ws-hubs" aria-labelledby="ws-hubs-h" hidden>
+          <h3 id="ws-hubs-h">Judgments that survey this doctrine <span class="mod mod-m3">HITS hubs</span></h3>
+          <p class="note">A hub cites many of the leading cases (authorities) in this query's citation neighbourhood, so it is a good place to read the line of authority.</p>
+          <ol class="rank-list" id="ws-hubs-list"></ol>
+        </section>
         <p class="legal-note">Treatment signals with evidence, from automated analysis of later judgments. Not legal advice: read the cited sentences and the judgments.</p>
       </section>
     </div>
@@ -289,6 +298,7 @@
         <p class="lede">Each signal is scaled to 0 to 1, weighted and summed. Weights are tuned on dev queries only and reported on test.</p>
       </header>
       <div class="container" id="eval-body"></div>
+      <div class="container" id="phase2-body"></div>
     </div>
 
     <!-- ================================================================ JUDGING (M4, reached from Ranking) -->

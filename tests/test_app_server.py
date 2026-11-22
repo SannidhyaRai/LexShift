@@ -84,7 +84,7 @@ def test_status_reports_which_signals_are_stubs(eval_workspace):
     st = s.status()
     assert st["stub_mode"] is False and st["stubbed"] == []
     assert set(st["providers"]) == {"search", "statute", "health", "authority"}
-    assert set(st["configs"]) == {"b0", "b1", "full"}
+    assert set(st["configs"]) == {"b0", "b1", "full", "full_hits", "full_tiered"}  # Phase 2 ablations are configured systems too
     assert abs(sum(st["configs"]["full"]["weights"].values()) - 1.0) < 1e-9
     stubbed = Service(providers=eval_workspace.providers.__class__(
         *[getattr(eval_workspace.providers, f) for f in ("search", "parse_query", "continuity", "health", "authority")],
@@ -609,3 +609,31 @@ def test_the_vendored_files_are_never_changed_by_line_ending_conversion():
     """A Windows checkout with core.autocrlf turns a minified script's line feeds into CRLF, and its recorded SHA-256 no longer matches."""
     attrs = (WEB.parents[1] / ".gitattributes").read_text(encoding="utf-8")
     assert "app/web/static/vendor/** -text" in attrs and "app/web/static/fonts/** -text" in attrs and "*.woff2 binary" in attrs
+
+
+# ----------------------------------------------------------------------------------------------- Phase 2 (M4)
+def test_compare_skips_phase2_configs_on_fake_providers_and_says_why(service):
+    out = service.compare("murder", "2025-01-10", 4)
+    assert set(out["skipped"]) == {"full_hits", "full_tiered"}
+    assert "not M1's" in out["skipped"]["full_tiered"] and "not M3's" in out["skipped"]["full_hits"]
+    assert out["hubs"] == [] and out["suggestion"] is None and out["wildcards"] == {}
+
+
+def test_search_refuses_a_phase2_config_it_cannot_run(service):
+    with pytest.raises(ServiceError) as err:
+        service.search("murder", "2025-01-10", 4, "full_hits")
+    assert err.value.status == 503
+
+
+def test_phase2_panels_report_missing_artefacts(service, monkeypatch, tmp_path):
+    import m4_rank.cluster as C
+
+    monkeypatch.setattr(C, "_path", lambda key, cfg=None: tmp_path / f"missing_{key}")
+    C._load.cache_clear()
+    try:
+        assert service.clusters()["available"] is False
+        with pytest.raises(ServiceError) as err:
+            service.cluster(0)
+        assert err.value.status == 503
+    finally:
+        C._load.cache_clear()

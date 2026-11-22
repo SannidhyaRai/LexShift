@@ -107,6 +107,12 @@ ranking:                            # owner: M4
     b0:   {rel: 1.0}                                                  # BM25 only
     b1:   {rel: 0.7, cont: 0.3}                                       # + statutory continuity (placeholder)
     full: {rel: 0.5, cont: 0.2, health: 0.2, auth: 0.1}               # + health + authority (placeholder)
+    # Phase 2 ablations (additive). Same starting weights as `full`; what differs is in `variants` below.
+    full_hits:   {rel: 0.5, cont: 0.2, health: 0.2, auth: 0.1}        # auth = HITS authority on the query's base set
+    full_tiered: {rel: 0.5, cont: 0.2, health: 0.2, auth: 0.1}        # candidates from the tiered index (inexact top-K)
+  variants:                         # how a config deviates from the default pipeline (Phase 2). Absent = default.
+    full_hits:   {auth_source: hits}          # pagerank (default) | hits  (m3_treatment.hits, query-dependent)
+    full_tiered: {candidate_source: tiered}   # exact (default, M1 search()) | tiered | champion | elimination | cluster
 
 evaluation:                         # owner: M4
   depth: 20                         # evaluate the top-20: the qrels pool is the union of the top-20 of every system
@@ -114,3 +120,28 @@ evaluation:                         # owner: M4
   relevant_threshold: 1             # grade >= 1 counts as relevant for P@k, R@k and MAP
   gain: exp                         # nDCG gain: exp = 2**grade - 1, linear = grade
   seed: 0
+
+clustering:                         # owner: M4 (m4_rank/cluster.py), Phase 2. Flat clustering for browsing, K-means written by us
+  k: auto                           # auto = the elbow of the RSS curve over k_grid (no labels involved); or a fixed integer
+  k_grid: [2, 4, 6, 8, 10, 12, 15, 20, 25, 30]
+  seed: 0
+  max_iter: 100
+  n_init: 3                         # k-means++ restarts (seed, seed+1, ...); the run with the lowest RSS is kept
+  vocab_size: 2000                  # top-M terms by df, after the df window below (laptop-sized dense vectors)
+  min_df: 10
+  max_df_ratio: 0.5                 # terms in more than half of the judgments carry little topical signal
+  label_terms: 4                    # surface words shown per cluster label
+  out: data/processed/clusters.jsonl
+  meta: data/processed/clusters_meta.json
+  report_dir: m4_rank/reports
+
+inexact:                            # owner: M4 (m4_rank/inexact.py), Phase 2. Inexact top-K (IIR 7.1-7.2); never the default config
+  artefact: data/processed/inexact.pkl.gz
+  champion_r: 50                    # champion list length per term, by g(d) + BM25 tf saturation
+  tier_cut: 0.8                     # tier 1 = authority g(d) at or above this quantile ...
+  tier1_min_bench: 3                # ... or a bench of at least this many judges
+  elim_max_df_ratio: 0.5            # index elimination: drop query terms in more than this share of judgments (low idf)
+  elim_min_share: 0.5               # ... and keep judgments containing at least this share of the remaining terms
+  leaders: 0                        # cluster pruning: 0 = round(sqrt(N)) leaders, chosen at random with `seed`
+  seed: 0
+  report_dir: m4_rank/reports

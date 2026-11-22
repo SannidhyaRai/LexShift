@@ -4,7 +4,9 @@ Choices, all recorded in DECISIONS.md D-007:
   * relevant = grade >= `threshold` (default 1) for P@k, Recall@k and AP; nDCG uses graded gains;
   * a document without a judgement counts as grade 0 (pooling assumption), `judged_at_k` reports how many were judged;
   * recall and AP are relative to the judged relevant documents (the pool), not the whole corpus;
-  * metrics that are undefined for a query (no relevant document) return None and are excluded from the mean.
+  * metrics that are undefined for a query (no relevant document) return None and are excluded from the mean;
+  * MRR is the mean over queries of the reciprocal rank (each query's value is its RR); AP11 is the 11-point interpolated AP;
+    R-prec is precision at R = the number of judged relevant documents. All are computed inside the evaluation depth.
 """
 
 from __future__ import annotations
@@ -78,6 +80,56 @@ def harmful_at_k(ranked: Sequence[str], overruled: set[str], k: int) -> float:
     return sum(1 for d in ranked[:k] if d in overruled) / k
 
 
+def r_precision(ranked: Sequence[str], grades: Grades, threshold: int = 1) -> float | None:
+    """Precision at rank R, R = the number of judged relevant documents (IIR 8.4). At R, precision equals recall."""
+    rel = _relevant(grades, threshold)
+    if not rel:
+        return None
+    return sum(1 for d in ranked[: len(rel)] if d in rel) / len(rel)
+
+
+def reciprocal_rank(ranked: Sequence[str], grades: Grades, threshold: int = 1) -> float | None:
+    """1 / rank of the first relevant document; 0 if none is returned; None if the query has no relevant document."""
+    rel = _relevant(grades, threshold)
+    if not rel:
+        return None
+    for i, d in enumerate(ranked, start=1):
+        if d in rel:
+            return 1.0 / i
+    return 0.0
+
+
+def pr_points(ranked: Sequence[str], grades: Grades, threshold: int = 1) -> list[tuple[float, float]]:
+    """(recall, precision) after each rank of `ranked`: the raw precision-recall curve (saw-toothed)."""
+    rel = _relevant(grades, threshold)
+    if not rel:
+        return []
+    hits, out = 0, []
+    for i, d in enumerate(ranked, start=1):
+        if d in rel:
+            hits += 1
+        out.append((hits / len(rel), hits / i))
+    return out
+
+
+RECALL_LEVELS = tuple(i / 10 for i in range(11))
+
+
+def interpolated_precision(ranked: Sequence[str], grades: Grades, threshold: int = 1) -> list[float] | None:
+    """Interpolated precision at the 11 recall levels 0.0, 0.1, ..., 1.0 (IIR 8.4): p_interp(r) = max precision at any recall >= r,
+    0 when the ranking never reaches that recall. None if the query has no relevant document."""
+    pts = pr_points(ranked, grades, threshold)
+    if not pts:
+        return None
+    return [max((p for r, p in pts if r >= level - 1e-12), default=0.0) for level in RECALL_LEVELS]
+
+
+def eleven_point_ap(ranked: Sequence[str], grades: Grades, threshold: int = 1) -> float | None:
+    """Mean of the 11 interpolated precisions (the TREC 11-point interpolated average precision)."""
+    ip = interpolated_precision(ranked, grades, threshold)
+    return None if ip is None else sum(ip) / len(ip)
+
+
 def evaluate_query(
     ranked: Sequence[str],
     grades: Grades,
@@ -94,16 +146,19 @@ def evaluate_query(
         "P@10": precision_at_k(ranked, grades, 10, threshold),
         "R@10": recall_at_k(ranked, grades, 10, threshold),
         "MAP": average_precision(ranked, grades, depth, threshold),
+        "AP11": eleven_point_ap(ranked, grades, threshold),
+        "R-prec": r_precision(ranked, grades, threshold),
+        "MRR": reciprocal_rank(ranked, grades, threshold),
         "nDCG@10": ndcg_at_k(ranked, grades, 10, gain),
         "harmful@10": harmful_at_k(ranked, overruled, 10) if overruled else None,
         "judged@10": judged_at_k(ranked, grades, 10),
     }
 
 
-METRIC_NAMES = ("P@5", "P@10", "R@10", "MAP", "nDCG@10", "harmful@10", "judged@10")
+METRIC_NAMES = ("P@5", "P@10", "R@10", "MAP", "AP11", "R-prec", "MRR", "nDCG@10", "harmful@10", "judged@10")
 # Metrics where higher is better and that measure ranking quality: the only valid tuning objectives. harmful@10 is
 # lower-is-better and judged@10 measures the pool, not the ranking, so neither may be optimised.
-OBJECTIVES = ("nDCG@10", "MAP", "P@5", "P@10", "R@10")
+OBJECTIVES = ("nDCG@10", "MAP", "P@5", "P@10", "R@10", "AP11", "R-prec", "MRR")
 
 
 def aggregate(per_query: Mapping[str, Mapping[str, float | None]]) -> dict[str, tuple[float | None, int]]:

@@ -6,6 +6,7 @@
 pyyaml>=6.0
 pytest>=8.0
 matplotlib>=3.8          # M4: report graphs (eval/plots.py imports it lazily; everything else works without it)
+numpy>=1.26              # M4: dense arrays for our own K-means, champion lists and cluster pruning (no IR is done by numpy itself)
 
 # --- in use by M3 (m3_treatment) ---
 # PageRank is our own power iteration (no networkx). The LLM client runs only in the offline labelling step

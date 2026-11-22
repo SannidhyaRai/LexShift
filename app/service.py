@@ -35,14 +35,15 @@ from eval.loaders import (
 )
 from m4_rank.explain import split_explanation, strip_controls
 from m4_rank.rank import ArtefactError, ContractViolation, collect, fuse_collected, load_checked
-from m4_rank.weights import SIGNALS, WeightsError, active_signals, canonical_config, load_weights, weights_source
+from m4_rank.weights import SIGNALS, WeightsError, active_signals, canonical_config, load_weights, variant, weights_source
 
 NOTE = (
     "These are treatment signals with evidence, produced by automated analysis of later judgments. They are not legal advice. "
     "A signal can be wrong, can apply to one point of a judgment only, or can be superseded by a pending reference to a larger "
     "bench: read the cited sentences and the judgments before relying on any of it."
 )
-CONFIG_NAMES = ("b0", "b1", "full")
+CONFIG_NAMES = ("b0", "b1", "full", "full_hits", "full_tiered")
+MAX_HUBS = 5
 JUDGES = ("judge1", "judge2")
 GRADES = (0, 1, 2)
 MAX_K = 50
@@ -516,7 +517,7 @@ class Service:
             started = time.perf_counter()
             used = [s for s in SIGNALS if s in active_signals(weights)]
             with self._lock:
-                collected = collect(query, date, active_signals(weights), providers=prov, cfg=cfg)
+                collected = collect(query, date, active_signals(weights), providers=prov, cfg=cfg, **self._variant(name, prov, cfg))
                 results = fuse_collected(collected, weights, k, cfg)
                 statutes = self._statutes(prov, query, date, used)
             meta = self.docs().all_meta()
@@ -533,6 +534,117 @@ class Service:
 
         return self._rank_errors(run)
 
+    # -- Phase 2 helpers ---------------------------------------------------------------------------
+    @staticmethod
+    def _variant(name: str, prov: Providers, cfg: dict[str, Any]) -> dict[str, str]:
+        """The config's candidate and authority source, or a ServiceError when its real data source is not available here."""
+        from eval.run_ablation import phase2_unavailable
+
+        why = phase2_unavailable(name, prov, cfg)
+        if why:
+            raise ServiceError(503, "artefact", f"{name} cannot run: {why}.")
+        return variant(name, cfg)
+
+    def _phase2_names(self, prov: Providers, cfg: dict[str, Any]) -> tuple[list[str], dict[str, str]]:
+        """The configs the comparison can show, and why each Phase 2 config it leaves out cannot run."""
+        from eval.run_ablation import phase2_unavailable
+
+        names, skipped = [], {}
+        for n in CONFIG_NAMES:
+            if n not in cfg["ranking"]["configs"]:
+                continue
+            why = phase2_unavailable(n, prov, cfg)
+            if why:
+                skipped[n] = why
+            else:
+                names.append(n)
+        return names, skipped
+
+    @staticmethod
+    def _tolerant(prov: Providers, query: str) -> dict[str, Any]:
+        """M1's did-you-mean and wildcard expansions for the query (Phase 2). Empty when search() is not M1's real one."""
+        out: dict[str, Any] = {"suggestion": None, "wildcards": {}}
+        if "search" in prov.stubbed or getattr(prov.search, "__module__", "") != "m1_index.searcher":
+            return out
+        try:
+            from m1_index import expand_wildcard, suggest
+
+            fix = suggest(query)
+            out["suggestion"] = _clean(fix) if fix and fix.strip() != query.strip() else None
+            for token in re.findall(r"[^\s\"()]*\*[^\s\"()]*", query)[:5]:
+                out["wildcards"][token] = expand_wildcard(token, limit=12)
+        except (OSError, RuntimeError, ValueError) as exc:
+            out["error"] = f"{type(exc).__name__}: {exc}"
+        return out
+
+    @staticmethod
+    def _clusters_of(doc_ids: Iterable[str]) -> dict[str, dict[str, Any]]:
+        """doc_id -> {id, label} from the frozen K-means clustering; {} when it has not been built."""
+        try:
+            from m4_rank.cluster import ClusterError, cluster_of
+        except ImportError:
+            return {}
+        out: dict[str, dict[str, Any]] = {}
+        for d in doc_ids:
+            try:
+                cid, label = cluster_of(d)
+            except ClusterError:
+                return {}
+            except KeyError:
+                continue
+            out[d] = {"id": cid, "label": _clean(label)}
+        return out
+
+    def _hubs(self, hubs: dict[str, float] | None, meta: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+        if not hubs:
+            return []
+        top = sorted(((d, v) for d, v in hubs.items() if v > 0), key=lambda kv: (-kv[1], kv[0]))[:MAX_HUBS]
+        return [{"doc_id": d, "hub": round(v, 4), "title": _clean((meta.get(d) or {}).get("title")) or None,
+                 "date": (meta.get(d) or {}).get("date")} for d, v in top]
+
+    def clusters(self) -> dict[str, Any]:
+        """The frozen clustering: K, how it was chosen, its evaluation and every cluster's label and size."""
+        from m4_rank.cluster import ClusterError, _load
+
+        try:
+            _, meta = _load()
+        except ClusterError as exc:
+            return {"available": False, "message": str(exc)}
+        keep = ("k", "k_rule", "k_elbow", "k_aic", "rss", "n_docs", "dims", "seed", "n_init", "rss_curve", "evaluation", "crosscheck")
+        return {"available": True, **{key: meta.get(key) for key in keep},
+                "clusters": [{**c, "label": _clean(c["label"])} for c in meta["clusters"]]}
+
+    def cluster(self, cluster_id: Any, n: Any = 25) -> dict[str, Any]:
+        """A cluster's most typical members (closest to the centroid first), with titles."""
+        from m4_rank.cluster import ClusterError, clusters_overview, members
+
+        try:
+            cid = int(cluster_id)
+            n = max(1, min(200, int(n)))
+        except (TypeError, ValueError) as exc:
+            raise ServiceError(400, "invalid", "cluster id and n must be whole numbers.") from exc
+        try:
+            rows = members(cid)
+            info = next(c for c in clusters_overview() if c["cluster_id"] == cid)
+        except ClusterError as exc:
+            raise ServiceError(503, "artefact", str(exc)) from exc
+        except (KeyError, StopIteration) as exc:
+            raise ServiceError(404, "not_found", f"There is no cluster {cluster_id}.") from exc
+        meta = self.docs().all_meta()
+        return {"cluster_id": cid, "label": _clean(info["label"]), "size": len(rows),
+                "top_offence": info.get("top_offence"), "top_offence_share": info.get("top_offence_share"),
+                "members": [{"doc_id": d, "distance": dist, "title": _clean((meta.get(d) or {}).get("title")) or None,
+                             "date": (meta.get(d) or {}).get("date")} for d, dist in rows[:n]]}
+
+    def inexact(self) -> dict[str, Any]:
+        """The frozen speed vs quality table of inexact top-K (m4_rank/reports/inexact.json)."""
+        path = ROOT / str(load_config()["inexact"]["report_dir"]) / "inexact.json"
+        if not path.exists():
+            return {"available": False, "message": "Run `python -m m4_rank.inexact report` to measure it."}
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return {"available": True, "k": data["k"], "queries": data["queries"], "settings": data["settings"],
+                "m1_search_median_ms": data["m1_search_median_ms"], "summary": data["summary"]}
+
     def compare(self, query: Any, offence_date: Any = None, k: Any = 10) -> dict[str, Any]:
         """B0, B1 and the full system over ONE collection of signals, with each document's rank under every config."""
         query, date, k = self._inputs(query, offence_date, k)
@@ -541,29 +653,42 @@ class Service:
         def run() -> dict[str, Any]:
             prov = self.providers()
             started = time.perf_counter()
-            names = [n for n in CONFIG_NAMES if n in cfg["ranking"]["configs"]]
+            names, skipped = self._phase2_names(prov, cfg)
             weights = {n: load_weights(n, cfg) for n in names}
+            keys = {n: (variant(n, cfg)["candidate_source"], variant(n, cfg)["auth_source"]) for n in names}
             with self._lock:
-                collected = collect(query, date, SIGNALS, providers=prov, cfg=cfg)
-                depth = max(1, len(collected.rows))
-                full_rankings = {n: fuse_collected(collected, weights[n], depth, cfg) for n in names}
+                by_key = {key: collect(query, date, SIGNALS, providers=prov, cfg=cfg, candidate_source=key[0], auth_source=key[1])
+                          for key in dict.fromkeys(keys.values())}
+                full_rankings = {n: fuse_collected(by_key[keys[n]], weights[n], max(1, len(by_key[keys[n]].rows)), cfg) for n in names}
                 statutes = self._statutes(prov, query, date, SIGNALS)
+                tolerant = self._tolerant(prov, query)
+            collected = by_key[("exact", "pagerank")] if ("exact", "pagerank") in by_key else next(iter(by_key.values()))
             position = {n: {r.doc_id: i for i, r in enumerate(rs, start=1)} for n, rs in full_rankings.items()}
             meta = self.docs().all_meta()
+            shown = {r.doc_id for n in names for r in full_rankings[n][:k]}
+            clusters = self._clusters_of(shown)
             out: dict[str, Any] = {}
             for n in names:
                 used = [s for s in SIGNALS if s in active_signals(weights[n])]
+                c = by_key[keys[n]]
+                results = []
+                for i, r in enumerate(full_rankings[n][:k], start=1):
+                    d = self._result(r, i, meta, {m: position[m].get(r.doc_id) for m in names})
+                    d["cluster"] = clusters.get(r.doc_id)
+                    results.append(d)
                 out[n] = {
                     "weights": weights[n], "source": weights_source(n, cfg), "signals_used": used,
-                    "stubbed": [s for s in collected.stubbed if s in used],
-                    "results": [
-                        self._result(r, i, meta, {m: position[m].get(r.doc_id) for m in names})
-                        for i, r in enumerate(full_rankings[n][:k], start=1)
-                    ],
+                    "stubbed": [s for s in c.stubbed if s in used],
+                    "candidate_source": c.candidate_source, "auth_source": c.auth_source, "candidates": len(c.rows),
+                    "results": results,
                 }
+            hits_key = next((keys[n] for n in names if keys[n][1] == "hits"), None)
             return {
                 "query": query, "offence_date": date, "k": k, "candidates": len(collected.rows),
-                "configs": out, "statutes": statutes,
+                "configs": out, "statutes": statutes, "skipped": skipped,
+                "suggestion": tolerant["suggestion"], "wildcards": tolerant["wildcards"],
+                "hubs": self._hubs(by_key[hits_key].hubs if hits_key else None, meta),
+                "clusters_available": bool(clusters),
                 "elapsed_ms": round((time.perf_counter() - started) * 1000), "note": NOTE,
             }
 

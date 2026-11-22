@@ -93,3 +93,8 @@ def hits(root_doc_ids: list[str], iterations: int = 50) -> tuple[dict[str, float
     """M3 stand-in for m3_treatment.hits.hits: (hubs, authorities) from the fixed table, hubs all 0."""
     auth = {d: (_TABLE[d][3] if d in _TABLE else 0.0) for d in root_doc_ids}
     return {d: 0.0 for d in root_doc_ids}, auth
+
+
+def cluster_of(doc_id: str) -> tuple[int, str]:
+    """M4 stand-in for m4_rank.cluster.cluster_of: every document in cluster 0, labelled as a stub."""
+    return 0, "STUB cluster"

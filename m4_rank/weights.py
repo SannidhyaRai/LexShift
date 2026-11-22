@@ -60,6 +60,27 @@ def validate_ranking_config(cfg: dict[str, Any]) -> None:
         raise WeightsError("evaluation.gain must be exp or linear")
 
 
+VARIANT_DEFAULTS = {"candidate_source": "exact", "auth_source": "pagerank"}
+CANDIDATE_SOURCES = ("exact", "champion", "tiered", "elimination", "cluster")  # m4_rank.inexact.METHODS
+AUTH_SOURCES = ("pagerank", "hits")
+
+
+def variant(config: str, cfg: dict[str, Any] | None = None) -> dict[str, str]:
+    """How `config` deviates from the default pipeline (Phase 2): its candidate source and its authority source."""
+    cfg = cfg or load_config()
+    name = canonical_config(config, cfg)
+    raw = dict((cfg["ranking"].get("variants") or {}).get(name) or {})
+    unknown = set(raw) - set(VARIANT_DEFAULTS)
+    if unknown:
+        raise WeightsError(f"ranking.variants.{name}: unknown key(s) {sorted(unknown)}; allowed {sorted(VARIANT_DEFAULTS)}")
+    out = {**VARIANT_DEFAULTS, **{k: str(v) for k, v in raw.items()}}
+    if out["candidate_source"] not in CANDIDATE_SOURCES:
+        raise WeightsError(f"ranking.variants.{name}.candidate_source must be one of {CANDIDATE_SOURCES}")
+    if out["auth_source"] not in AUTH_SOURCES:
+        raise WeightsError(f"ranking.variants.{name}.auth_source must be one of {AUTH_SOURCES}")
+    return out
+
+
 def canonical_config(name: str, cfg: dict[str, Any] | None = None) -> str:
     cfg = cfg or load_config()
     key = ALIASES.get(name.strip().lower(), name.strip().lower())

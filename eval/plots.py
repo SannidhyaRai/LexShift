@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 QUALITY = ("P@5", "R@10", "MAP", "nDCG@10")
-COLOURS = {"b0": "#7f7f7f", "b1": "#1f77b4", "full": "#d95f02"}  # distinguishable for common colour-vision deficiencies
+COLOURS = {"b0": "#7f7f7f", "b1": "#1f77b4", "full": "#d95f02", "full_hits": "#7570b3", "full_tiered": "#1b9e77"}  # colour-blind safe
 
 
 def _value(raw: Any) -> float | None:
@@ -60,6 +60,37 @@ def bar_chart(rows: Sequence[dict[str, Any]], path: Path, title: str) -> bool:
         ax2.spines[["top", "right"]].set_visible(False)
 
     fig.suptitle(f"LexShift ablation: {title}", fontsize=10)
+    fig.tight_layout()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=160)
+    plt.close(fig)
+    return True
+
+
+PR_COLOURS = COLOURS
+
+
+def pr_curve(curves: dict[str, Sequence[float]], path: Path, title: str) -> bool:
+    """Mean 11-point interpolated precision-recall curve, one line per config. Returns False if matplotlib is unavailable."""
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        return False
+    levels = [i / 10 for i in range(11)]
+    fig, ax = plt.subplots(figsize=(5.5, 4))
+    markers = "osD^v<>"
+    for i, (name, ys) in enumerate(curves.items()):
+        ax.plot(levels, ys, marker=markers[i % len(markers)], ms=4, lw=1.5, label=name, color=PR_COLOURS.get(name, "#444444"))
+    ax.set_xlabel("recall")
+    ax.set_ylabel("interpolated precision")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1.05)
+    ax.legend(frameon=False, fontsize=8)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.set_title(f"LexShift 11-point interpolated PR: {title}", fontsize=9)
     fig.tight_layout()
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=160)

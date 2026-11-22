@@ -5,11 +5,12 @@ import { $, clear, f2, f3, h, pct, plural, SIGNALS, SIGNAL_LABEL } from "./dom.j
 import { animateIn } from "./motion.js";
 import { appStatus } from "./status.js";
 
-const CONFIG_TEXT = { b0: "B0: BM25 only", b1: "B1: + continuity", full: "Full: all four signals" };
+const CONFIG_TEXT = { b0: "B0: BM25 only", b1: "B1: + continuity", full: "Full: all four signals", full_hits: "Full, HITS authority", full_tiered: "Full, tiered index" };
 
-const METRICS = ["P@5", "P@10", "R@10", "MAP", "nDCG@10", "harmful@10", "judged@10"];
+const METRICS = ["P@5", "P@10", "R@10", "MAP", "AP11", "R-prec", "MRR", "nDCG@10", "harmful@10", "judged@10"];
 const METRIC_HELP = {
   "P@5": "precision at 5", "P@10": "precision at 10", "R@10": "recall at 10", MAP: "mean average precision", "nDCG@10": "nDCG at 10",
+  AP11: "11-point interpolated average precision", "R-prec": "precision at R, R = judged relevant documents", MRR: "mean reciprocal rank of the first relevant document",
   "harmful@10": "share of the top 10 that is a known-overruled case (lower is better)", "judged@10": "share of the top 10 that was judged",
 };
 const SIG_KEYS = [["w_rel", "rel"], ["w_cont", "cont"], ["w_health", "health"], ["w_auth", "auth"]];
