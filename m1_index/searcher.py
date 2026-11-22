@@ -12,10 +12,19 @@ and `evaluate()` returns a `WorkStats` so the saving can be counted.
 Positions are numbered from 0 inside each zone and the zones of a document are appended one after another, so phrase and proximity
 matching works on the merged positions of all zones (a phrase can therefore match across a zone boundary; this is the behaviour
 the index has always had and it is kept).
+
+Skip pointers (m1_index.skips): when an AND or phrase intersection scans a posting list, it merges the sorted candidates with it using
+skip pointers every sqrt(L) entries (`skips=False` gives the plain merge); `WorkStats.comparisons` counts the document-number
+comparisons so the saving can be measured. The documents found are the same either way.
+
+Wildcards (m1_index.dictionary): a WildcardNode is expanded, on first use, to the index terms of its most frequent matching surface
+words and evaluated as their OR; a phrase with a wildcard word is the OR of the phrases its expansions spell. Spelling suggestions
+and Soundex live in the dictionary module; `filters={"party": name}` keeps judgments whose title sounds like the name.
 """
 
 from __future__ import annotations
 
+import itertools
 import math
 from bisect import bisect_left
 from dataclasses import dataclass
@@ -31,8 +40,11 @@ from m1_index.query_parser import (
     PhraseNode,
     ProximityNode,
     TermNode,
+    WildcardNode,
+    WildcardPhraseNode,
     parse_query,
 )
+from m1_index.skips import intersect
 from m1_index.tokenizer import tokenize
 
 ZONE_WEIGHTS = {
@@ -53,6 +65,8 @@ class WorkStats:
 
     postings_read: int = 0
     positional_checks: int = 0
+    comparisons: int = 0      # document-number comparisons in merge intersections (m1_index.skips)
+    skips_followed: int = 0   # skip pointers taken in those merges
 
     @property
     def total(self) -> int:
@@ -64,10 +78,17 @@ class RankedSearchEngine:
 
     _instance = None
 
-    def __init__(self, index_dir: Path | str | None = None, index: InvertedIndex | None = None):
+    def __init__(self, index_dir: Path | str | None = None, index: InvertedIndex | None = None, dictionary: object | None = None,
+                 skips: bool = True):
         """`index_dir` defaults to the repository's data/processed/index (not the working directory); `index` hands in an index
-        that is already in memory."""
-        self.index = index if index is not None else InvertedIndex.load(INDEX_DIR if index_dir is None else index_dir)
+        that is already in memory, `dictionary` a SurfaceDictionary (loaded from the index directory on first use otherwise).
+        `skips` turns skip pointers on in merge intersections."""
+        self.index_dir = INDEX_DIR if index_dir is None else Path(index_dir)
+        self.index = index if index is not None else InvertedIndex.load(self.index_dir)
+        self.skips = skips
+        self.skips_merge = True  # False restores the C set intersection (no comparison counts); kept for the timing comparison
+        self._dictionary = dictionary
+        self._soundex = None
         self.doc_meta = self.index.doc_meta
         self.doc_count = len(self.doc_meta)
         self.all_doc_ids = set(self.doc_meta.keys())
@@ -173,6 +194,15 @@ class RankedSearchEngine:
         if isinstance(node, NotNode):
             return self._all_nums - self._naive(node.child, work)
 
+        if isinstance(node, WildcardNode):
+            out = set()
+            for t in self._wildcard_terms(node):
+                out |= self._naive(TermNode(t), work)
+            return out
+
+        if isinstance(node, WildcardPhraseNode):
+            return self._naive(self._expand_phrase(node), work)
+
         return set()
 
     def _positions_num(self, term: str, num: int) -> list[int]:
@@ -232,6 +262,10 @@ class RankedSearchEngine:
                 kids = [self._estimate(n) for n in self._flatten(node, "AND") if not isinstance(n, NotNode)]
                 return min(kids, default=self.doc_count)
             return min(self.doc_count, sum(self._estimate(n) for n in self._flatten(node, "OR")))
+        if isinstance(node, WildcardNode):
+            return min(self.doc_count, sum(self.index.df(t) for t in self._wildcard_terms(node)))
+        if isinstance(node, WildcardPhraseNode):
+            return self._estimate(self._expand_phrase(node))
         return self.doc_count  # a NOT matches the complement
 
     def _term_docs(self, tp: TermPostings | None, restrict: set[int] | None, work: WorkStats) -> set[int]:
@@ -245,7 +279,10 @@ class RankedSearchEngine:
             work.postings_read += probe_cost
             return {n for n in restrict if tp.find(n) >= 0}
         work.postings_read += tp.df
-        return restrict.intersection(tp.docs())
+        if not self.skips_merge:
+            return restrict.intersection(tp.docs())
+        cand = sorted(restrict)
+        return set(intersect(cand, 0, len(cand), self.index.p_doc, tp.lo, tp.hi, self.skips, work))
 
     def _phrase_docs(self, terms: list[str], restrict: set[int] | None, work: WorkStats) -> set[int]:
         if not terms:
@@ -363,6 +400,18 @@ class RankedSearchEngine:
             inner = self._opt(node.child, restrict, work)
             return set(self._all_nums if restrict is None else restrict) - inner
 
+        if isinstance(node, WildcardNode):  # the OR of its expanded terms
+            found = set()
+            for t in self._wildcard_terms(node):
+                remaining = None if restrict is None else restrict - found
+                if remaining is not None and not remaining:
+                    break
+                found |= self._term_docs(self.index.term_postings(t), remaining, work)
+            return found
+
+        if isinstance(node, WildcardPhraseNode):
+            return self._opt(self._expand_phrase(node), restrict, work)
+
         return set()
 
     def evaluate(self, node: object, optimise: bool = True, restrict_ids: set[str] | None = None) -> tuple[set[str], WorkStats]:
@@ -395,7 +444,72 @@ class RankedSearchEngine:
                 stack.append(n.left)
             elif isinstance(n, NotNode):
                 stack.append(n.child)
+            elif isinstance(n, WildcardNode):
+                out.extend(self._wildcard_terms(n))
+            elif isinstance(n, WildcardPhraseNode):
+                stack.append(self._expand_phrase(n))
         return out
+
+    # --- wildcards and the dictionary layer ---
+
+    @property
+    def dictionary(self):
+        """The SurfaceDictionary beside the index (m1_index.dictionary), loaded on first use."""
+        if self._dictionary is None:
+            from m1_index.dictionary import INDEX_DIR as DEFAULT_DIR, SurfaceDictionary, get_dictionary
+
+            # the default index shares the process-wide dictionary; another index directory loads its own
+            self._dictionary = get_dictionary() if self.index_dir == DEFAULT_DIR else SurfaceDictionary.load(self.index_dir)
+        return self._dictionary
+
+    def _wildcard_terms(self, node: WildcardNode) -> list[str]:
+        """The index terms of a wildcard, expanded once and kept on the node: the stems of its most frequent matching surface words
+        (`tolerant.wildcard_limit`), restricted to terms of this index."""
+        if node.terms is None:
+            from m1_index.dictionary import settings
+
+            try:
+                stems = self.dictionary.wildcard_terms(node.pattern, int(settings()["wildcard_limit"]))
+            except ValueError:
+                stems = []
+            node.terms = [t for t in stems if self.index.df(t) > 0]
+        return node.terms
+
+    def _expand_phrase(self, node: WildcardPhraseNode) -> object:
+        """A phrase with wildcard words as the OR of plain phrases, one per combination of the slots' terms. When the combinations
+        exceed `tolerant.wildcard_phrase_limit`, the slot with the most terms loses its least frequent one until they fit."""
+        if node.expanded is not None:
+            return node.expanded
+        from m1_index.dictionary import settings
+
+        cap = int(settings()["wildcard_phrase_limit"])
+        slots: list[list[str]] = []
+        for part in node.parts:
+            if isinstance(part, WildcardNode):
+                terms = sorted(self._wildcard_terms(part), key=lambda t: (-self.index.df(t), t))
+                slots.append(terms)
+            else:
+                slots.append([part])
+        if any(not s for s in slots):
+            node.expanded = PhraseNode([])  # a slot that matches nothing: no document has the phrase
+            return node.expanded
+        while math.prod(len(s) for s in slots) > cap:
+            longest = max(range(len(slots)), key=lambda i: len(slots[i]))
+            slots[longest] = slots[longest][:-1]
+        phrases = [PhraseNode(list(combo)) for combo in itertools.product(*slots)]
+        expanded: object = phrases[0]
+        for p in phrases[1:]:
+            expanded = BooleanNode("OR", expanded, p)
+        node.expanded = expanded
+        return expanded
+
+    def _party_docs(self, name: str) -> set[int]:
+        """Documents whose title sounds like `name` (Soundex over the words of the case titles; m1_index.dictionary)."""
+        if self._soundex is None:
+            from m1_index.dictionary import SoundexIndex
+
+            self._soundex = SoundexIndex((d, m.get("title") or "") for d, m in self.doc_meta.items())
+        return {self.index.doc_num_of[d] for d in self._soundex.match(str(name)) if d in self.index.doc_num_of}
 
     # --- BM25 Scoring ---
 
@@ -466,6 +580,9 @@ class RankedSearchEngine:
                 want = filters[key]
                 passing = {n for n, d in enumerate(self.index.doc_ids) if self.doc_meta.get(d, {}).get(key) == want}
                 nums = passing if nums is None else nums & passing
+        if filters.get("party"):
+            passing = self._party_docs(filters["party"])
+            nums = passing if nums is None else nums & passing
         return nums
 
     def _candidates(self, query: str, allowed: set[int] | None, work: WorkStats) -> tuple[set[int], list[str]]:

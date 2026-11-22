@@ -135,6 +135,10 @@ def normalize_citations(text: str) -> str:
 # Main tokenizer
 # =========================================================
 
+# The word pattern, shared with surface_tokens() so the dictionary of surface forms sees exactly the words the index sees.
+RAW_TOKEN_RE = re.compile(r"[a-z]+(?:-[a-z0-9]+)*|\d+[a-z]*(?:-[a-z0-9]+)*")
+
+
 def tokenize(text: str) -> list[str]:
     """
     Legal-aware IR tokenizer.
@@ -178,10 +182,7 @@ def tokenize(text: str) -> list[str]:
     #   2025insc
     #   appellant-foreign
     #
-    raw_tokens = re.findall(
-        r"[a-z]+(?:-[a-z0-9]+)*|\d+[a-z]*(?:-[a-z0-9]+)*",
-        text,
-    )
+    raw_tokens = RAW_TOKEN_RE.findall(text)
 
     tokens = []
 
@@ -206,6 +207,28 @@ def tokenize(text: str) -> list[str]:
         tokens.append(STEMMER.stem(token))
 
     return tokens
+
+
+# =========================================================
+# Surface forms (for wildcards and spelling correction)
+# =========================================================
+
+def surface_tokens(text: str) -> list[tuple[str, str]]:
+    """(surface word, index term) for every word tokenize() keeps, in order.
+
+    The surface word is the lower-cased word before stemming ("murdered"); the index term is what tokenize() emits for it
+    ("murder"). `[t for _, t in surface_tokens(x)] == tokenize(x)` for every text. The dictionary layer runs wildcards and
+    spelling correction on surface words and maps the result to index terms with this pairing.
+    """
+    if not text:
+        return []
+    out = []
+    for token in RAW_TOKEN_RE.findall(normalize_citations(text).lower()):
+        if is_legal_token(token):
+            out.append((token, token))
+        elif token not in STOPWORDS:
+            out.append((token, STEMMER.stem(token)))
+    return out
 
 
 # =========================================================

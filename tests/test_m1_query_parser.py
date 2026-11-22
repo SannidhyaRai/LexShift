@@ -11,7 +11,8 @@ import pytest
 
 pytest.importorskip("nltk")
 try:
-    from m1_index.query_parser import BooleanNode, NotNode, PhraseNode, ProximityNode, TermNode, normalize_term, parse_query, tokenize_query
+    from m1_index.query_parser import (BooleanNode, NotNode, PhraseNode, ProximityNode, TermNode, WildcardNode, WildcardPhraseNode,
+                                       normalize_term, parse_query, tokenize_query)
 except (LookupError, RuntimeError, ImportError) as exc:  # NLTK stop words missing, for example
     pytest.skip(f"M1 cannot be imported here: {exc}", allow_module_level=True)
 
@@ -121,7 +122,7 @@ def test_random_token_soup_is_either_a_tree_or_a_value_error():
             errors += 1
         else:
             trees += 1
-            assert isinstance(tree, (TermNode, PhraseNode, ProximityNode, BooleanNode, NotNode))
+            assert isinstance(tree, (TermNode, PhraseNode, ProximityNode, BooleanNode, NotNode, WildcardNode, WildcardPhraseNode))
     assert trees > 100 and errors > 100  # the soup is varied enough to hit both outcomes
 
 
