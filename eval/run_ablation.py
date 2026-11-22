@@ -26,16 +26,19 @@ from common.io import write_delimited  # noqa: E402
 from common.providers import Providers, load_providers  # noqa: E402
 from common.schema import Query  # noqa: E402
 from eval.loaders import EvalDataError, load_overruled, load_qrels, load_queries  # noqa: E402
-from eval.metrics import METRIC_NAMES, OBJECTIVES, aggregate, evaluate_query, paired_bootstrap  # noqa: E402
+from eval.metrics import (  # noqa: E402
+    METRIC_NAMES, OBJECTIVES, RECALL_LEVELS, aggregate, evaluate_query, interpolated_precision, paired_bootstrap,
+)
 from eval.tuning import TuningError, save_tuned, tune_config  # noqa: E402
 from m4_rank.rank import (  # noqa: E402
     ArtefactError, Collected, ContractViolation, collect, fuse_collected, load_checked, stubbed_groups,
 )
 from m4_rank.weights import (  # noqa: E402
-    SIGNALS, active_signals, canonical_config, format_weights, load_weights, signals_used, weights_source,
+    SIGNALS, active_signals, canonical_config, format_weights, load_weights, signals_used, variant, weights_source,
 )
 
-DEFAULT_CONFIGS = "b0,b1,full"
+DEFAULT_CONFIGS = "b0,b1,full,full_hits,full_tiered"
+VariantKey = tuple[str, str]  # (candidate_source, auth_source)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -61,32 +64,112 @@ def usable_queries(queries: list[Query], qrels: Mapping[str, Mapping[str, int]],
 
 
 def collect_all(
-    queries: list[Query], signals: tuple[str, ...], providers: Providers, cfg: dict[str, Any]
+    queries: list[Query], signals: tuple[str, ...], providers: Providers, cfg: dict[str, Any],
+    key: tuple[str, str] = ("exact", "pagerank"),
 ) -> dict[str, Collected]:
-    return {q.qid: collect(q.text, q.offence_date, signals, providers=providers, cfg=cfg) for q in queries}
+    return {q.qid: collect(q.text, q.offence_date, signals, providers=providers, cfg=cfg,
+                           candidate_source=key[0], auth_source=key[1]) for q in queries}
+
+
+def variant_key(name: str, cfg: dict[str, Any]) -> tuple[str, str]:
+    v = variant(name, cfg)
+    return v["candidate_source"], v["auth_source"]
+
+
+def phase2_unavailable(name: str, providers: Providers, cfg: dict[str, Any]) -> str:
+    """Why a Phase 2 variant cannot run on these providers ('' if it can). The inexact candidates read M1's real index and HITS
+    reads M3's real citation graph, so they only make sense next to the real search() / authority() (or their flagged stubs)."""
+    cand, auth = variant_key(name, cfg)
+    real_search = "search" not in providers.stubbed
+    if cand != "exact" and real_search and getattr(providers.search, "__module__", "") != "m1_index.searcher":
+        return f"its candidates come from M1's index ({cand}), but search() here is not M1's"
+    if cand != "exact" and real_search:
+        from m4_rank.inexact import _path
+
+        if not _path("artefact", cfg).exists():
+            return "the inexact-retrieval artefact is missing (python -m m4_rank.inexact build)"
+    if auth == "hits" and "authority" not in providers.stubbed \
+            and getattr(providers.authority, "__module__", "") != "m3_treatment.scores":
+        return "HITS reads M3's citation graph, but authority() here is not M3's"
+    return ""
+
+
+def by_variant(names: list[str], cfg: dict[str, Any]) -> dict[tuple[str, str], list[str]]:
+    groups: dict[tuple[str, str], list[str]] = {}
+    for n in names:
+        groups.setdefault(variant_key(n, cfg), []).append(n)
+    return groups
+
+
+def collect_groups(
+    groups: Mapping[tuple[str, str], list[str]], weights: Mapping[str, Mapping[str, float]], queries: list[Query],
+    providers: Providers, cfg: dict[str, Any], reuse: Mapping[tuple[str, str], Mapping[str, Collected]] | None = None,
+) -> dict[tuple[str, str], dict[str, Collected]]:
+    """Signals collected once per (variant, query), reusing what an earlier step (tuning) already collected."""
+    out: dict[tuple[str, str], dict[str, Collected]] = {}
+    for key, members in groups.items():
+        signals = signals_used(weights, members)
+        old = (reuse or {}).get(key, {})
+        keep = {qid: c for qid, c in old.items() if set(signals) <= set(c.signals)}
+        missing = [q for q in queries if q.qid not in keep]
+        out[key] = {**{q.qid: keep[q.qid] for q in queries if q.qid in keep},
+                    **collect_all(missing, signals, providers, cfg, key)}
+    return out
 
 
 def evaluate_configs(
     weights_by_config: Mapping[str, Mapping[str, float]],
-    collected: Mapping[str, Collected],
+    collected: Mapping[str, Mapping[str, Collected]],
     queries: list[Query],
     qrels: Mapping[str, Mapping[str, int]],
     overruled: set[str],
     cfg: dict[str, Any],
 ) -> dict[str, dict[str, dict[str, float | None]]]:
-    """config -> qid -> metrics. Signals were collected once per query; each config only re-fuses them."""
+    """config -> qid -> metrics. `collected` is config -> qid -> Collected, shared by the configs of one variant, so each
+    config only re-fuses signals that were collected once."""
     ev = cfg["evaluation"]
     depth = int(ev["depth"])
     out: dict[str, dict[str, dict[str, float | None]]] = {}
     for name, weights in weights_by_config.items():
         out[name] = {}
         for q in queries:
-            ranked = [r.doc_id for r in fuse_collected(collected[q.qid], weights, depth, cfg)]
+            ranked = [r.doc_id for r in fuse_collected(collected[name][q.qid], weights, depth, cfg)]
             out[name][q.qid] = evaluate_query(
                 ranked, qrels[q.qid], overruled or None,
                 depth=depth, threshold=int(ev["relevant_threshold"]), gain=str(ev["gain"]),
             )
     return out
+
+
+def pr_curves(
+    weights_by_config: Mapping[str, Mapping[str, float]],
+    collected: Mapping[str, Mapping[str, Collected]],
+    queries: list[Query],
+    qrels: Mapping[str, Mapping[str, int]],
+    cfg: dict[str, Any],
+) -> dict[str, list[float]]:
+    """config -> mean 11-point interpolated precision over the queries that have a relevant document (IIR 8.4)."""
+    ev = cfg["evaluation"]
+    depth, threshold = int(ev["depth"]), int(ev["relevant_threshold"])
+    out: dict[str, list[float]] = {}
+    for name, weights in weights_by_config.items():
+        rows = []
+        for q in queries:
+            ranked = [r.doc_id for r in fuse_collected(collected[name][q.qid], weights, depth, cfg)]
+            ip = interpolated_precision(ranked, qrels[q.qid], threshold)
+            if ip is not None:
+                rows.append(ip)
+        out[name] = [sum(col) / len(rows) for col in zip(*rows)] if rows else [0.0] * len(RECALL_LEVELS)
+    return out
+
+
+def pr_markdown(curves: Mapping[str, list[float]]) -> str:
+    head = ["config", *(f"{lv:.1f}" for lv in RECALL_LEVELS)]
+    lines = ["", "## 11-point interpolated precision (mean over queries)", "",
+             "| " + " | ".join(head) + " |", "|" + "|".join("---" for _ in head) + "|"]
+    lines += ["| " + " | ".join([name, *(f"{v:.3f}" for v in ys)]) + " |" for name, ys in curves.items()]
+    lines += ["", "Recall is relative to the judged relevant documents, inside the evaluation depth."]
+    return "\n".join(lines) + "\n"
 
 
 def _fmt(x: float | None) -> str:
@@ -178,6 +261,7 @@ def render_markdown(
 def write_outputs(
     out_dir: Path, prefix: str, split: str, queries: list[Query], results: Mapping[str, Any],
     weights: Mapping[str, Mapping[str, float]], markdown: str, plots: bool,
+    curves: Mapping[str, list[float]] | None = None,
 ) -> list[Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
@@ -205,6 +289,12 @@ def write_outputs(
         png = out_dir / f"{prefix}ablation_{split}.png"
         if bar_chart(rows, png, f"{split} split ({len(queries)} queries)"):
             written.append(png)
+            if curves:
+                from eval.plots import pr_curve
+
+                pr_png = out_dir / f"{prefix}pr_{split}.png"
+                if pr_curve(dict(curves), pr_png, f"{split} split ({len(queries)} queries)"):
+                    written.append(pr_png)
         else:
             print("matplotlib is not installed: skipping the chart (pip install matplotlib).")
     return written
@@ -247,11 +337,20 @@ def _main(argv: list[str] | None = None) -> int:
         return 2
 
     split = args.split or ("dev" if args.tune else "test")
+    providers = load_checked(load_providers, cfg)
+    explicit = args.configs != DEFAULT_CONFIGS
+    for n in list(names):
+        why = phase2_unavailable(n, providers, cfg)
+        if why:
+            if explicit:
+                print(f"Cannot run {n}: {why}.")
+                return 2
+            print(f"Skipping {n}: {why}.")
+            names.remove(n)
     weights = {n: load_weights(n, cfg) for n in names}
     sources = {n: weights_source(n, cfg) for n in names}
     signals = signals_used(weights, names)
 
-    providers = load_checked(load_providers, cfg)
     stubbed = stubbed_groups(providers, signals)
     if stubbed and not args.allow_stubs:
         print("Refusing to run: these providers are fixed-value stubs, so the numbers would not be results: "
@@ -264,17 +363,17 @@ def _main(argv: list[str] | None = None) -> int:
         print(f"*** STUB RUN ({', '.join(stubbed)}): exercising the pipeline only; these numbers are not results. ***")
 
     tuned_now = False
-    dev_collected: dict[str, Collected] = {}  # kept so a dev evaluation after tuning does not call the providers again
+    dev_collected: dict[tuple[str, str], dict[str, Collected]] = {}  # kept so a dev evaluation after tuning does not call the providers again
     if args.tune:
         dev, dev_skipped = usable_queries(queries, qrels, "dev")
         if dev_skipped:
             print(f"Dev queries without judgements are skipped for tuning: {', '.join(dev_skipped)}")
         try:
             tunable = [n for n in names if len(active_signals(weights[n])) > 1]
-            dev_collected = collect_all(dev, signals_used(weights, tunable), providers, cfg)
+            dev_collected = collect_groups(by_variant(tunable, cfg), weights, dev, providers, cfg)
             new: dict[str, dict[str, float]] = {}
             for n in tunable:
-                res = tune_config(n, dev_collected, dev, qrels, overruled or None, objective=args.objective,
+                res = tune_config(n, dev_collected[variant_key(n, cfg)], dev, qrels, overruled or None, objective=args.objective,
                                   step=args.step, floors={"rel": args.min_rel}, cfg=cfg)
                 new[n] = res.best.weights
                 print(f"\ntuned {n} on {res.n_queries} dev queries ({res.grid_size} weight vectors), objective {res.objective}:")
@@ -296,16 +395,16 @@ def _main(argv: list[str] | None = None) -> int:
     if not queries_in_split:
         print(f"No {split} queries with judgements: nothing to evaluate.")
         return 2
-    reusable = {qid: c for qid, c in dev_collected.items() if set(signals) <= set(c.signals)}
-    missing = [q for q in queries_in_split if q.qid not in reusable]
-    collected = {**{q.qid: reusable[q.qid] for q in queries_in_split if q.qid in reusable},
-                 **collect_all(missing, signals, providers, cfg)}
+    by_key = collect_groups(by_variant(names, cfg), weights, queries_in_split, providers, cfg, reuse=dev_collected)
+    collected = {n: by_key[variant_key(n, cfg)] for n in names}
     results = evaluate_configs(weights, collected, queries_in_split, qrels, overruled, cfg)
     markdown = render_markdown(split, queries_in_split, skipped, results, weights, sources, providers, cfg,
                                len(overruled), tuned_now, args.bootstrap)
+    curves = pr_curves(weights, collected, queries_in_split, qrels, cfg)
+    markdown += pr_markdown(curves)
     print("\n" + markdown)
     out_dir = Path(args.out) if args.out else resolve_path("results_dir", cfg)
-    for path in write_outputs(out_dir, prefix, split, queries_in_split, results, weights, markdown, not args.no_plots):
+    for path in write_outputs(out_dir, prefix, split, queries_in_split, results, weights, markdown, not args.no_plots, curves):
         print(f"wrote {path}")
     return 0
 

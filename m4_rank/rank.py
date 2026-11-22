@@ -24,7 +24,7 @@ from common.config import load_config
 from common.providers import SIGNAL_GROUP, Providers, load_providers
 from common.schema import Hit, QueryStatutes, Result
 from m4_rank.fusion import SignalRow, fuse
-from m4_rank.weights import SIGNALS, active_signals, load_weights
+from m4_rank.weights import SIGNALS, active_signals, load_weights, variant
 
 
 class ContractViolation(RuntimeError):
@@ -85,6 +85,9 @@ class Collected:
     signals: tuple[str, ...]  # signals that were collected, always including "rel"
     rows: list[SignalRow]
     stubbed: tuple[str, ...]  # collected signals served by fixed-value stubs
+    candidate_source: str = "exact"  # Phase 2: exact (M1 search()) or an inexact method (m4_rank.inexact)
+    auth_source: str = "pagerank"    # Phase 2: pagerank (M3 authority()) or hits (M3 hits(), query-dependent)
+    hubs: dict[str, float] | None = None  # HITS hub scores over the base set, when auth_source is hits (for the demo)
 
 
 def stubbed_groups(providers: Providers, signals: tuple[str, ...]) -> list[str]:
@@ -115,15 +118,32 @@ def collect(
     providers: Providers | None = None,
     candidates: int | None = None,
     cfg: dict[str, Any] | None = None,
+    candidate_source: str = "exact",
+    auth_source: str = "pagerank",
 ) -> Collected:
-    """Top-`candidates` hits from search(), plus the requested signals for each, all unmodified."""
+    """Top-`candidates` hits from search(), plus the requested signals for each, all unmodified.
+
+    Phase 2 variants: `candidate_source` other than "exact" takes the candidates from m4_rank.inexact (the same Hit contract);
+    `auth_source="hits"` replaces authority() by HITS authority over the base set of the candidates (m3_treatment.hits). Both obey
+    the stub switches: with `search` stubbed the stub still supplies the candidates, with `authority` stubbed the HITS stub is used.
+    """
     _validate_inputs(query, offence_date)
     cfg = cfg or load_config()
     providers = providers or load_providers(cfg)
     n = candidates or int(cfg["ranking"]["candidates"])
     wanted = tuple(s for s in SIGNALS if s == "rel" or s in signals)
 
-    hits = _call("search()", providers.search, query, n)
+    search_fn = providers.search
+    if candidate_source != "exact" and "search" not in providers.stubbed:
+        from m4_rank.inexact import search_fn as inexact_fn
+
+        search_fn = inexact_fn(candidate_source)
+    try:
+        hits = _call("search()", search_fn, query, n)
+    except RuntimeError as exc:
+        if type(exc).__name__ == "InexactError":
+            raise ArtefactError(f"search() via {candidate_source}: {exc}") from exc
+        raise
     if isinstance(hits, list):
         hits = [as_hit(h) for h in hits]
     _enforce(contracts.check_hits(hits, n), "search()")
@@ -142,17 +162,37 @@ def collect(
             out = _call(f"health({row.doc_id})", providers.health, row.doc_id, (qs.offence_ids or None) if qs else None)
             _enforce(contracts.check_health(out), f"health({row.doc_id})")
             row.raw["health"], row.evidence = float(out[0]), list(out[1])
-        if "auth" in wanted:
+        if "auth" in wanted and auth_source == "pagerank":
             value = _call(f"authority({row.doc_id})", providers.authority, row.doc_id)
             _enforce(contracts.check_authority(value), f"authority({row.doc_id})")
             row.raw["auth"] = float(value)
+
+    hubs = None
+    if "auth" in wanted and auth_source == "hits" and rows:
+        hits_fn = _hits_provider(providers)
+        hubs, auths = _call("hits()", hits_fn, [r.doc_id for r in rows])
+        for row in rows:
+            value = float(auths.get(row.doc_id, 0.0))
+            _enforce(contracts.check_authority(value), f"hits authority({row.doc_id})")
+            row.raw["auth"] = value
 
     stubbed = tuple(providers.stubbed_signals(wanted))
     if "rel" in stubbed:
         # The candidates are placeholders, so a "real" statute or treatment module was only asked about ids it has never
         # seen: nothing computed on them is a result, whatever that module is.
         stubbed = wanted
-    return Collected(query, offence_date, wanted, rows, stubbed)
+    return Collected(query, offence_date, wanted, rows, stubbed, candidate_source, auth_source, hubs)
+
+
+def _hits_provider(providers: Providers):
+    """M3's hits(), or its flagged stub when the authority group is stubbed (the same switch as authority())."""
+    if "authority" in providers.stubbed:
+        import stubs
+
+        return stubs.hits
+    from m3_treatment.hits import hits
+
+    return hits
 
 
 def fuse_collected(
@@ -173,11 +213,13 @@ def rank(
     *,
     providers: Providers | None = None,
 ) -> list[Result]:
-    """Top-`k` results with per-signal breakdown and explanation. `config` is one of b0, b1, full (b2 = full).
+    """Top-`k` results with per-signal breakdown and explanation. `config` is one of b0, b1, full (b2 = full), or the Phase 2
+    ablations full_hits (HITS authority) and full_tiered (tiered-index candidates).
 
     Only the providers a config needs are called: `b0` never touches the statute or treatment modules.
     """
     cfg = load_config()
     weights = load_weights(config, cfg)
-    collected = collect(query, offence_date, active_signals(weights), providers=providers, cfg=cfg)
+    v = variant(config, cfg)
+    collected = collect(query, offence_date, active_signals(weights), providers=providers, cfg=cfg, **v)
     return fuse_collected(collected, weights, k, cfg)
