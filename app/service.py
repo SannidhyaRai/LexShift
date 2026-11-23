@@ -205,6 +205,10 @@ class Service:
         self._write_lock = threading.Lock()
         self._docs: DocStore | None = None
         self._docs_key: tuple[str, str] | None = None
+        self._m3_lock = threading.Lock()  # one build of the Treatment page's counts at a time (_m3_counts)
+        self._m3_cache: tuple[tuple, dict[str, Any]] | None = None
+        self._corpus_ids_lock = threading.Lock()  # one scan of judgments.jsonl at a time (_corpus_ids)
+        self._corpus_ids_cache: tuple[tuple, set[str] | None] | None = None
 
     # -- M1's Index page ---------------------------------------------------------------------------
     def _explore(self, call: Callable[[IndexExplorer], Any]) -> Any:
@@ -277,9 +281,20 @@ class Service:
             return (str(p), p.stat().st_size, p.stat().st_mtime_ns) if p.exists() else (str(p),)
 
         key = tuple(stamp(p) for p in paths.values())
-        cached = getattr(self, "_m3_cache", None)
+        cached = self._m3_cache
         if cached and cached[0] == key:
             return cached[1]
+        # One build at a time: the counts read M3's large files (seconds of work), and requests that arrive together (a reload, the
+        # Statutes and Treatment pages at once) must wait for that one build instead of each starting their own and starving each other.
+        with self._m3_lock:
+            cached = self._m3_cache
+            if cached and cached[0] == key:
+                return cached[1]
+            out = self._build_m3_counts(paths)
+            self._m3_cache = (key, out)
+            return out
+
+    def _build_m3_counts(self, paths: dict[str, Path]) -> dict[str, Any]:
         citations, doc_health = paths["citations"], paths["doc_health"]
         labels: Counter[str] = Counter()  # over resolved mentions only: M3 classifies only those (llm.scope: resolved)
         confidence: Counter[str] = Counter()
@@ -346,7 +361,6 @@ class Service:
             "with_evidence": sum(1 for r in health if r.get("evidence")),
             "top_authority": [{"doc_id": r["doc_id"], "title": title(r["doc_id"]), "authority": r["authority"]} for r in top],
         }
-        self._m3_cache = (key, out)
         return out
 
     @staticmethod
@@ -762,13 +776,30 @@ class Service:
         findings = None
         try:
             needed = {d for docs in qrels.values() for d in docs} | overruled
-            findings = check_data_files(queries, qrels, overruled, corpus_ids(needed) if needed else set())
+            findings = check_data_files(queries, qrels, overruled, self._corpus_ids(needed, cfg) if needed else set())
         except Exception as exc:  # noqa: BLE001 - the checker must never take the page down
             data["errors"].append(f"data checks failed: {type(exc).__name__}: {exc}")
         data["checks"] = (
             {"errors": findings.errors, "warnings": findings.warnings, "info": findings.info} if findings else None
         )
         return {"data": data, "runs": self._ablation_runs(Path(resolve_path("results_dir", cfg))), "rounds": self._round_names()}
+
+    def _corpus_ids(self, needed: set[str], cfg: dict[str, Any]) -> set[str] | None:
+        """eval.check_data.corpus_ids (a scan of judgments.jsonl, seconds), cached until the doc ids asked for or the corpus file change.
+        Only the corpus lookup is cached: the hand-made queries, qrels and gold list are re-read and re-checked on every request."""
+        path = resolve_path("judgments", cfg)
+        stat = path.stat() if path.exists() else None
+        key = (frozenset(needed), str(path), stat.st_size if stat else None, stat.st_mtime_ns if stat else None)
+        cached = self._corpus_ids_cache
+        if cached and cached[0] == key:
+            return cached[1]
+        with self._corpus_ids_lock:
+            cached = self._corpus_ids_cache
+            if cached and cached[0] == key:
+                return cached[1]
+            found = corpus_ids(needed, path)
+            self._corpus_ids_cache = (key, found)
+            return found
 
     @staticmethod
     def _ablation_runs(results_dir: Path) -> list[dict[str, Any]]:

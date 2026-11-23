@@ -637,3 +637,60 @@ def test_phase2_panels_report_missing_artefacts(service, monkeypatch, tmp_path):
         assert err.value.status == 503
     finally:
         C._load.cache_clear()
+
+
+# ---------------------------------------------------------------------------------------------- concurrent page loads
+def _together(n, call):
+    """Run `call` from n threads released at the same moment; return their results."""
+    gate = threading.Barrier(n)
+    results = [None] * n
+
+    def run(i):
+        gate.wait()
+        results[i] = call()
+
+    threads = [threading.Thread(target=run, args=(i,)) for i in range(n)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=30)
+    return results
+
+
+def test_m3_counts_are_built_once_when_requests_arrive_together(tmp_path, monkeypatch):
+    # A reload used to start one full read of M3's files per waiting request; they starved each other for minutes.
+    builds = []
+
+    def slow_build(self, paths):
+        builds.append(1)
+        threading.Event().wait(0.2)
+        return {"built": len(builds)}
+
+    monkeypatch.setattr(Service, "_build_m3_counts", slow_build)
+    data = tmp_path / "citations.jsonl"
+    data.write_text("{}\n", encoding="utf-8")
+    s = Service(providers=None)
+    results = _together(6, lambda: s._m3_counts({"citations": data}))
+    assert len(builds) == 1
+    assert all(r == {"built": 1} for r in results)
+    data.write_text("{}\n{}\n", encoding="utf-8")  # a changed file is read again
+    assert s._m3_counts({"citations": data}) == {"built": 2}
+
+
+def test_corpus_lookup_is_scanned_once_and_redone_when_asked_for_other_ids(tmp_path, monkeypatch):
+    scans = []
+
+    def slow_scan(needed, path=None):
+        scans.append(frozenset(needed))
+        threading.Event().wait(0.2)
+        return set(needed)
+
+    monkeypatch.setattr("app.service.corpus_ids", slow_scan)
+    corpus = tmp_path / "judgments.jsonl"
+    corpus.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr("app.service.resolve_path", lambda key, cfg=None: corpus)
+    s = Service(providers=None)
+    results = _together(5, lambda: s._corpus_ids({"a", "b"}, {}))
+    assert len(scans) == 1 and all(r == {"a", "b"} for r in results)
+    assert s._corpus_ids({"a", "c"}, {}) == {"a", "c"}  # other ids: scanned again
+    assert len(scans) == 2
